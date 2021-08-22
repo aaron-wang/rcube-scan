@@ -6,7 +6,8 @@ color = np.uint8([[[
     # 76,52,36
     # 52,36,28
     # 36,36,58
-    192,207,204
+    # 192,207,204
+    12,12,10
 ]]])
 
 hsv_color = cv.cvtColor(color, cv.COLOR_BGR2HSV)
