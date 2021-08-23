@@ -73,7 +73,9 @@ def create_rotated_image():
             global rotated_image
             rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
 
-
+def create_contour_preview(color,mask):
+    preview_frame = cv.bitwise_and(frame,frame,mask=mask)
+    cv.imshow(color,preview_frame)
 
 def myContour(color, mask):
     contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
@@ -155,9 +157,6 @@ while True:
     ret,frame = cap.read()
     hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
     masks = dict((c,cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
-    # print(type(masks['yellow']))
-    # masks_list = [(cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors]
-    # print(type(masks_list[0]))
     # # Red
     # lred = np.array([0,135,73])
     # hred = np.array([10,255,255])
@@ -168,33 +167,9 @@ while True:
     # r_mask |= r_mask2
     # red = cv.bitwise_and(frame,frame,mask=r_mask)
 
-
-    # # Orange
-    # lorange = np.array([10,150,100])
-    # horange = np.array([20,255,255])
-    # o_mask = cv.inRange(hsv_frame,lorange,horange)
-    # orange = cv.bitwise_and(frame,frame,mask=o_mask)
-    # for c in colors:
-        # myContour(c,masks[c]) 
-    it = 0
     for c in colors:
         myContour(c,masks[c])
-        # myContour(c,masks_list[it])
-        # it+=1
-    # myContour("yellow",y_mask)
-    # cv.imshow('yellow mask',yellow)
-
-    # myContour("green",g_mask)
-    # cv.imshow('green mask',green)
-
-    # myContour("blue",b_mask)
-    # cv.imshow('blue mask',blue)
-
-    # myContour("red",r_mask)
-    # cv.imshow("red mask", red)
-
-    # myContour("white",w_mask)
-    # cv.imshow("white mask",white)
+        create_contour_preview(c,masks[c])
 
     # myContour("orange",o_mask)
     # cv.imshow("orange mask",orange)
