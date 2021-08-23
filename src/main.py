@@ -13,6 +13,8 @@ cubes = []
 widths = []
 center2 = (0,0)
 
+rotate_success = True
+
 cap = cv.VideoCapture(0,cv.CAP_DSHOW)
 
 def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
@@ -47,7 +49,7 @@ def simple_rotated_contour(color,mask):
                 approx = cv.approxPolyDP(c,epsilon,True)
                 cv.drawContours(rotated_frame,approx,-1,(0,255,0),3)
 def create_rotated_frame(frame):
-    global rotated_frame
+    global rotated_frame, rotate_success
     widths.sort()
     rotate_angle = 0
     cube_angles = sorted([c[1] for c in cubes])
@@ -64,13 +66,14 @@ def create_rotated_frame(frame):
             rotate_angle = median_angle
     
     if (rotate_angle > 45): rotate_angle -= 90
-    if (abs(rotate_angle-45) < 0.5):
+    if (abs(rotate_angle-45) < 1.0):
         print("Please rotate cube")
+        rotate_success = False
     else:
         height, width = frame.shape[:2]
         r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
-        if (len(widths) >= 1):
-            rotated_frame = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
+        # if (len(widths) >= 1):
+        rotated_frame = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
 
 def create_contour_preview(frame,window_name,mask):
     preview_frame = cv.bitwise_and(frame,frame,mask=mask)
@@ -162,8 +165,8 @@ while True:
     masks = dict((c,cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
     masks['red'] |= cv.inRange(hsv_frame,*RED_UNION_BOUND)
     
-    if (SHOW_CONTOUR_PREVIEW):
-        original_frame = copy.copy(frame)
+    # if (SHOW_CONTOUR_PREVIEW):
+    original_frame = copy.copy(frame)
 
     for c in colors:
         draw_cube_contour(frame,c,masks[c])
@@ -174,23 +177,23 @@ while True:
     ### Handle rotated recognition.
 
     create_rotated_frame(original_frame)
-    # convert 
-    hsv_rotated_frame = cv.cvtColor(rotated_frame,cv.COLOR_BGR2HSV)
-    # generate masks.
-    rotated_masks = dict((c,cv.inRange(hsv_rotated_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
-    rotated_masks['red'] |= cv.inRange(hsv_rotated_frame,*RED_UNION_BOUND)
-    
-    if (SHOW_CONTOUR_PREVIEW):
-        original_rotated_frame = copy.copy(rotated_frame)
-
-    for c in colors:
-        draw_cube_contour(rotated_frame,c,rotated_masks[c])
+    if (rotate_success):
+        # convert 
+        hsv_rotated_frame = cv.cvtColor(rotated_frame,cv.COLOR_BGR2HSV)
+        # generate masks.
+        rotated_masks = dict((c,cv.inRange(hsv_rotated_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
+        rotated_masks['red'] |= cv.inRange(hsv_rotated_frame,*RED_UNION_BOUND)
+        
         if (SHOW_CONTOUR_PREVIEW):
-            create_contour_preview(original_rotated_frame,c,rotated_masks[c])
-            pass
+            original_rotated_frame = copy.copy(rotated_frame)
 
-
-    cv.imshow('Rotated image', rotated_frame)
+        for c in colors:
+            draw_cube_contour(rotated_frame,c,rotated_masks[c])
+            if (SHOW_CONTOUR_PREVIEW):
+                create_contour_preview(original_rotated_frame,c,rotated_masks[c])
+                pass
+        cv.imshow('Rotated image', rotated_frame)
+    rotate_success = True
 
     cv.imshow('frame',frame)
     
@@ -200,7 +203,7 @@ while True:
     key = cv.waitKey(5)
     if (key == ord('q')): 
         break
-    
+# End process
 cap.release()
 cv.destroyAllWindows()
 
