@@ -6,18 +6,47 @@ from math import sin, cos, radians, pi
 
 from constants import *
 
+import json, time
+
 # cubes: ((x,y), angle)
 cubes = []
 widths = []
 center2 = (0,0)
+
+cap = cv.VideoCapture(0,cv.CAP_DSHOW)
+global rotated_image
 
 def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
     return (w > CONTOUR_BYPASS_SCALE * h 
         or h > CONTOUR_BYPASS_SCALE *w 
         or max(w,h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
 
-cap = cv.VideoCapture(0,cv.CAP_DSHOW)
+def simple_rotated_contour(color,mask):
+    contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+    if (len(contours) >= 1):
+        text_color = (0,0,255)
+        for c in contours:
+            if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
+                x, y, w, h = cv.boundingRect(c)
+                if (contour_bypass(w,h,LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)): 
+                    continue
+                rect = cv.minAreaRect(c)
+                w2, h2 = rect[1]; 
+                box = cv.boxPoints(rect); box = np.int0(box)
+                # Bypass false detection (strict)
+                if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
+                    continue
+                #angle
+                cv.rectangle(rotated_image,(x,y),(x+w,y+h),(0,0,255),2)
+                # Draw text color name
+                if (SHOW_CONTOUR_COLOR_TEXT):
+                    cv.putText(rotated_image,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
 
+                # Contour approximation based on the Douglas - Peucker algorithm
+                # over simplification: turn a curve into a similar one with less points.
+                epsilon = 0.1*cv.arcLength(c,True)
+                approx = cv.approxPolyDP(c,epsilon,True)
+                cv.drawContours(frame,approx,-1,(0,255,0),3)
 def create_rotated_image():
     widths.sort()
     rotate_angle = 0
@@ -41,16 +70,16 @@ def create_rotated_image():
         height, width = frame.shape[:2]
         r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
         if (len(widths) >= 1):
+            global rotated_image
             rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
-            cv.imshow('Rotated image', rotated_image)
 
 
 
-def myContour(colorName, mask):
+def myContour(color, mask):
     contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
     if (len(contours) >= 1):
         text_color = (255,255,255)
-        if (colorName=="yellow" or colorName == "white"): text_color = (0,0,0)
+        if (color=="yellow" or color == "white"): text_color = (0,0,0)
         for c in contours:
             if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
                 x, y, w, h = cv.boundingRect(c)
@@ -96,7 +125,7 @@ def myContour(colorName, mask):
                 
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
-                    cv.putText(frame,colorName,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
+                    cv.putText(frame,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
 
                 # Contour approximation based on the Douglas - Peucker algorithm
                 # over simplification: turn a curve into a similar one with less points.
@@ -104,91 +133,91 @@ def myContour(colorName, mask):
                 approx = cv.approxPolyDP(c,epsilon,True)
                 cv.drawContours(frame,approx,-1,(0,255,0),3)
 
+with open("config.json") as f:
+    data = json.load(f)
 
+colors = ['yellow', 'green', 'blue', 'red', 'white', 'orange']
+
+
+HSV_BOUND = dict()
+HSV_BOUND_LIST = list()
+for c in colors:
+    HSV_BOUND[c] = (np.array(data['colors'][c]['lower_bound']),np.array(data['colors'][c]['upper_bound']))
+
+HSV_BOUND_LIST = [(np.array(data['colors'][c]['lower_bound']),np.array(data['colors'][c]['upper_bound'])) for c in colors]
+masks = list()
+
+# exit()
+avg_seconds = 0
+cnt = 0
 while True:
+    start = time.time()
     ret,frame = cap.read()
     hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
+    masks = dict((c,cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
+    # print(type(masks['yellow']))
+    # masks_list = [(cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors]
+    # print(type(masks_list[0]))
+    # # Red
+    # lred = np.array([0,135,73])
+    # hred = np.array([10,255,255])
+    # r_mask = cv.inRange(hsv_frame,lred,hred)
+    # lred2 = np.array([170,50,73])
+    # hred2 = np.array([180,255,255])
+    # r_mask2 = cv.inRange(hsv_frame,lred2,hred2)
+    # r_mask |= r_mask2
+    # red = cv.bitwise_and(frame,frame,mask=r_mask)
 
-    # Yellow
-    lyellow = np.array([19,100,80])
-    uyellow = np.array([40,255,255])
-    y_mask = cv.inRange(hsv_frame,lyellow,uyellow)
-    yellow = cv.bitwise_and(frame,frame,mask=y_mask)
 
-    # Green
-    lgreen = np.array([70,60,80])
-    hgreen = np.array([96,255,255])
-    g_mask = cv.inRange(hsv_frame,lgreen,hgreen)
-    green = cv.bitwise_and(frame,frame,mask=g_mask)
-
-    # Blue
-    lblue = np.array([100,97,78])
-    hblue = np.array([123,255,255])
-    b_mask = cv.inRange(hsv_frame,lblue,hblue)
-    blue = cv.bitwise_and(frame,frame,mask=b_mask)
-
-    # Red
-    lred = np.array([0,135,73])
-    hred = np.array([10,255,255])
-    r_mask = cv.inRange(hsv_frame,lred,hred)
-    lred2 = np.array([170,50,73])
-    hred2 = np.array([180,255,255])
-    r_mask2 = cv.inRange(hsv_frame,lred2,hred2)
-    r_mask |= r_mask2
-    red = cv.bitwise_and(frame,frame,mask=r_mask)
-
-    # White
-    # or use 180 as hue upper bound
-    # or use 180 instead of 150 VALUE
-    lwhite = np.array([30,0,150])
-    hwhite = np.array([150,40,255])
-    w_mask = cv.inRange(hsv_frame,lwhite,hwhite)
-    white = cv.bitwise_and(frame,frame,mask=w_mask)
-
-    # Orange
-    lorange = np.array([10,150,100])
-    horange = np.array([20,255,255])
-    o_mask = cv.inRange(hsv_frame,lorange,horange)
-    orange = cv.bitwise_and(frame,frame,mask=o_mask)
-
-    # Black
-    lblack = np.array([80,0,0])
-    hblack = np.array([100,55,20])
-    black_mask = cv.inRange(hsv_frame,lblack,hblack)
-    black = cv.bitwise_and(frame,frame,mask=black_mask)
-
-    
-    myContour("yellow",y_mask)
+    # # Orange
+    # lorange = np.array([10,150,100])
+    # horange = np.array([20,255,255])
+    # o_mask = cv.inRange(hsv_frame,lorange,horange)
+    # orange = cv.bitwise_and(frame,frame,mask=o_mask)
+    # for c in colors:
+        # myContour(c,masks[c]) 
+    it = 0
+    for c in colors:
+        myContour(c,masks[c])
+        # myContour(c,masks_list[it])
+        # it+=1
+    # myContour("yellow",y_mask)
     # cv.imshow('yellow mask',yellow)
 
-    myContour("green",g_mask)
-    cv.imshow('green mask',green)
+    # myContour("green",g_mask)
+    # cv.imshow('green mask',green)
 
-    myContour("blue",b_mask)
+    # myContour("blue",b_mask)
     # cv.imshow('blue mask',blue)
 
-    myContour("red",r_mask)
+    # myContour("red",r_mask)
     # cv.imshow("red mask", red)
 
-    myContour("white",w_mask)
+    # myContour("white",w_mask)
     # cv.imshow("white mask",white)
 
-    myContour("orange",o_mask)
+    # myContour("orange",o_mask)
     # cv.imshow("orange mask",orange)
 
-    myContour("black",black_mask)
-    # cv.imshow("black mask",black)
 
-    create_rotated_image()
+    # create_rotated_image()
+    # simple_rotated_contour("red",r_mask)
+    # cv.imshow('Rotated image', rotated_image)
+
 
     cv.imshow('frame',frame)
     
     cubes.clear()
     widths.clear()
-
-    key = cv.waitKey(5)
+    end = time.time()
+    print((end-start) * 1000,"ms")
+    key = cv.waitKey(1)
     if (key == ord('q')): 
         break
+    avg_seconds += end-start
+    cnt+=1
+
+print("AVERAGE",avg_seconds / cnt * 1000)
 
 cap.release()
 cv.destroyAllWindows()
