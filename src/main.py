@@ -14,7 +14,6 @@ widths = []
 center2 = (0,0)
 
 cap = cv.VideoCapture(0,cv.CAP_DSHOW)
-global rotated_image
 
 def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
     return (w > CONTOUR_BYPASS_SCALE * h 
@@ -37,17 +36,18 @@ def simple_rotated_contour(color,mask):
                 if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
                     continue
                 #angle
-                cv.rectangle(rotated_image,(x,y),(x+w,y+h),(0,0,255),2)
+                cv.rectangle(rotated_frame,(x,y),(x+w,y+h),(0,0,255),2)
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
-                    cv.putText(rotated_image,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
+                    cv.putText(rotated_frame,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
 
                 # Contour approximation based on the Douglas - Peucker algorithm
                 # over simplification: turn a curve into a similar one with less points.
                 epsilon = 0.1*cv.arcLength(c,True)
                 approx = cv.approxPolyDP(c,epsilon,True)
-                cv.drawContours(frame,approx,-1,(0,255,0),3)
-def create_rotated_image():
+                cv.drawContours(rotated_frame,approx,-1,(0,255,0),3)
+def create_rotated_frame(frame):
+    global rotated_frame
     widths.sort()
     rotate_angle = 0
     cube_angles = sorted([c[1] for c in cubes])
@@ -70,14 +70,13 @@ def create_rotated_image():
         height, width = frame.shape[:2]
         r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
         if (len(widths) >= 1):
-            global rotated_image
-            rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
+            rotated_frame = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
 
-def create_contour_preview(color,mask):
-    preview_frame = cv.bitwise_and(original_frame,original_frame,mask=mask)
-    cv.imshow(color,preview_frame)
+def create_contour_preview(frame,window_name,mask):
+    preview_frame = cv.bitwise_and(frame,frame,mask=mask)
+    cv.imshow(window_name,preview_frame)
 
-def myContour(color, mask):
+def draw_cube_contour(frame,color, mask):
     contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
     if (len(contours) >= 1):
         text_color = (255,255,255)
@@ -128,12 +127,13 @@ def myContour(color, mask):
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
                     cv.putText(frame,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
-
+                
                 # Contour approximation based on the Douglas - Peucker algorithm
                 # over simplification: turn a curve into a similar one with less points.
                 epsilon = 0.1*cv.arcLength(c,True)
                 approx = cv.approxPolyDP(c,epsilon,True)
                 cv.drawContours(frame,approx,-1,(0,255,0),3)
+                
 
 with open("config.json") as f:
     data = json.load(f)
@@ -148,9 +148,12 @@ for c in colors:
 RED_UNION_BOUND = (np.array(data['colors']['red']['lower_bound2']),np.array(data['colors']['red']['upper_bound2']))
 
 masks = list()
+rotated_masks = list()
 
 while True:
     ret,frame = cap.read()
+
+    ### Main color recognition
 
     # Convert from BGR to HSV colorspace.
     hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
@@ -163,14 +166,32 @@ while True:
         original_frame = copy.copy(frame)
 
     for c in colors:
-        myContour(c,masks[c])
+        draw_cube_contour(frame,c,masks[c])
         if SHOW_CONTOUR_PREVIEW:
-            create_contour_preview(c,masks[c])
+            create_contour_preview(original_frame,c,masks[c])
+            pass
 
-    # create_rotated_image()
-    # simple_rotated_contour("red",r_mask)
-    # cv.imshow('Rotated image', rotated_image)
+    ### Handle rotated recognition.
+
+    create_rotated_frame(original_frame)
+    # convert 
+    hsv_rotated_frame = cv.cvtColor(rotated_frame,cv.COLOR_BGR2HSV)
+    # generate masks.
+    rotated_masks = dict((c,cv.inRange(hsv_rotated_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
+    rotated_masks['red'] |= cv.inRange(hsv_rotated_frame,*RED_UNION_BOUND)
     
+    if (SHOW_CONTOUR_PREVIEW):
+        original_rotated_frame = copy.copy(rotated_frame)
+
+    for c in colors:
+        draw_cube_contour(rotated_frame,c,rotated_masks[c])
+        if (SHOW_CONTOUR_PREVIEW):
+            create_contour_preview(original_rotated_frame,c,rotated_masks[c])
+            pass
+
+
+    cv.imshow('Rotated image', rotated_frame)
+
     cv.imshow('frame',frame)
     
     cubes.clear()
