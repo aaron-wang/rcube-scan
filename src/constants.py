@@ -1,5 +1,6 @@
 SHOW_CONTOUR_COLOR_TEXT = True
 SHOW_ENTIRE_BOUNDING_RECTANGLE = False
+SHOW_CONTOUR_PREVIEW = False
 
 ### CONTOURS
 # Global contour area requirement

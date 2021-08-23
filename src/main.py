@@ -6,7 +6,7 @@ from math import sin, cos, radians, pi
 
 from constants import *
 
-import json, time
+import json, time, copy
 
 # cubes: ((x,y), angle)
 cubes = []
@@ -74,7 +74,7 @@ def create_rotated_image():
             rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
 
 def create_contour_preview(color,mask):
-    preview_frame = cv.bitwise_and(frame,frame,mask=mask)
+    preview_frame = cv.bitwise_and(original_frame,original_frame,mask=mask)
     cv.imshow(color,preview_frame)
 
 def myContour(color, mask):
@@ -142,58 +142,44 @@ colors = ['yellow', 'green', 'blue', 'red', 'white', 'orange']
 
 
 HSV_BOUND = dict()
-HSV_BOUND_LIST = list()
 for c in colors:
     HSV_BOUND[c] = (np.array(data['colors'][c]['lower_bound']),np.array(data['colors'][c]['upper_bound']))
 
-HSV_BOUND_LIST = [(np.array(data['colors'][c]['lower_bound']),np.array(data['colors'][c]['upper_bound'])) for c in colors]
+RED_UNION_BOUND = (np.array(data['colors']['red']['lower_bound2']),np.array(data['colors']['red']['upper_bound2']))
+
 masks = list()
 
-# exit()
-avg_seconds = 0
-cnt = 0
 while True:
-    start = time.time()
     ret,frame = cap.read()
+
+    # Convert from BGR to HSV colorspace.
     hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
+    
+    # Generate masks.
     masks = dict((c,cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
-    # # Red
-    # lred = np.array([0,135,73])
-    # hred = np.array([10,255,255])
-    # r_mask = cv.inRange(hsv_frame,lred,hred)
-    # lred2 = np.array([170,50,73])
-    # hred2 = np.array([180,255,255])
-    # r_mask2 = cv.inRange(hsv_frame,lred2,hred2)
-    # r_mask |= r_mask2
-    # red = cv.bitwise_and(frame,frame,mask=r_mask)
+    masks['red'] |= cv.inRange(hsv_frame,*RED_UNION_BOUND)
+    
+    if (SHOW_CONTOUR_PREVIEW):
+        original_frame = copy.copy(frame)
 
     for c in colors:
         myContour(c,masks[c])
-        create_contour_preview(c,masks[c])
-
-    # myContour("orange",o_mask)
-    # cv.imshow("orange mask",orange)
-
+        if SHOW_CONTOUR_PREVIEW:
+            create_contour_preview(c,masks[c])
 
     # create_rotated_image()
     # simple_rotated_contour("red",r_mask)
     # cv.imshow('Rotated image', rotated_image)
-
-
+    
     cv.imshow('frame',frame)
     
     cubes.clear()
     widths.clear()
-    end = time.time()
-    print((end-start) * 1000,"ms")
-    key = cv.waitKey(1)
+
+    key = cv.waitKey(5)
     if (key == ord('q')): 
         break
-    avg_seconds += end-start
-    cnt+=1
-
-print("AVERAGE",avg_seconds / cnt * 1000)
-
+    
 cap.release()
 cv.destroyAllWindows()
 
