@@ -1,6 +1,13 @@
 import numpy as np
 import cv2 as cv
 
+from constants import *
+
+def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
+    return (w > CONTOUR_BYPASS_SCALE * h 
+        or h > CONTOUR_BYPASS_SCALE *w 
+        or max(w,h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
+
 import math
 
 cap = cv.VideoCapture(0,cv.CAP_DSHOW)
@@ -8,52 +15,52 @@ cap = cv.VideoCapture(0,cv.CAP_DSHOW)
 def myContour(colorName, mask):
     contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
     if (len(contours) >= 1):
-        c_threshold = 500
         text_color = (255,255,255)
-        if (colorName=="yellow"): text_color = (0,0,0)
-        if (colorName=="white"): text_color = (0,0,0)
+        if (colorName=="yellow" or colorName == "white"): text_color = (0,0,0)
         for c in contours:
-            if (cv.contourArea(c) > c_threshold):
+            if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
                 x, y, w, h = cv.boundingRect(c)
-                if (colorName=="white" or colorName=="red" or colorName=="orange"):
-                    if (w > 1.2 * h or h > 1.2*w or h > 120):
-                        continue
-                # General rectangle contour
-                # cv.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
-
-                # Rotated rectangle
+                # Bypass false detection (short ciruit)
+                if (contour_bypass(w,h,LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)): 
+                    continue
+                # Generate rotated rectangle
                 rect = cv.minAreaRect(c)
-                rot_area = rect[1][0] * rect[1][1]
-                box = cv.boxPoints(rect)
-                box = np.int0(box)
-
-                # Min circle
+                w2, h2 = rect[1]; rot_area = w2 * h2
+                box = cv.boxPoints(rect); box = np.int0(box)
+                # Bypass false detection (strict)
+                if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
+                    continue
+                # Draw min circle
                 (cx,cy),radius = cv.minEnclosingCircle(c)
                 center = (int(cx),int(cy))
                 circ_area = math.pi * radius * radius
                 radius = int(radius)
-                # FOR GAN SYTLE RUBIK'S CUBES
-                # DETECT CENTER CIRCLE (instead of perceived square)
+                # FOR CIRCLE CENTER SYTLE RUBIK'S CUBES:
+                # - Detect center circle (instead of perceived square)
                 # If the bounding circle is "larger" than the square then this is a square.
+                    # ([ ])
                 # Else this is a circle (the smaller circle is enclosed in the square).
-                if (circ_area > 1.1*rot_area):
+                    # [ O ]
+                if (circ_area > CIRCLE_CONTOUR_BYPASS_SCALE*rot_area):
                     cv.drawContours(frame,[box],0,(0,255,0),2)
+                    pass
                 else:
                     cv.circle(frame,center,radius,(0,0,255),2)
-                    # optionally draw rough bounding rectangle.
-                    cv.rectangle(frame,(x-w,y-h),(x+2*w,y+2*h),(255,0,0),2)
-                # Draw text color name.
-                cv.putText(frame,colorName,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
-                    # M = cv.moments(c)
-                    # cx = int(M['m10']/M['m00'])
-                    # cy = int(M['m01']/M['m00'])
-                    # cv.putText(frame,colorName[0],(cx,cy),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
+                    # optionally draw rough bounding rectangle for entire cube.
+                    if (SHOW_ENTIRE_BOUNDING_RECTANGLE):
+                        w*=1.3; h*=1.3
+                        w = int(w); h = int(h)
+                        cv.rectangle(frame,(x-w,y-h),(x+2*w,y+2*h),(255,0,0),2)
+                # Draw text color name
+                if (SHOW_CONTOUR_COLOR_TEXT):
+                    cv.putText(frame,colorName,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
 
                 # Contour approximation based on the Douglas - Peucker algorithm
                 # over simplification: turn a curve into a similar one with less points.
                 epsilon = 0.1*cv.arcLength(c,True)
                 approx = cv.approxPolyDP(c,epsilon,True)
-                cv.drawContours(frame,approx,-1,(255,255,255),3)
+                cv.drawContours(frame,approx,-1,(0,255,0),3)
+
 
 while True:
     ret,frame = cap.read()
@@ -67,7 +74,7 @@ while True:
     yellow = cv.bitwise_and(frame,frame,mask=y_mask)
 
     #green
-    lgreen = np.array([70,120,60])
+    lgreen = np.array([70,60,10])
     hgreen = np.array([96,255,255])
     g_mask = cv.inRange(hsv_frame,lgreen,hgreen)
     green = cv.bitwise_and(frame,frame,mask=g_mask)
@@ -79,10 +86,10 @@ while True:
     blue = cv.bitwise_and(frame,frame,mask=b_mask)
 
     #red
-    lred = np.array([0,99,73])
+    lred = np.array([0,135,73])
     hred = np.array([10,255,255])
     r_mask = cv.inRange(hsv_frame,lred,hred)
-    lred2 = np.array([170,99,73])
+    lred2 = np.array([170,50,73])
     hred2 = np.array([180,255,255])
     r_mask2 = cv.inRange(hsv_frame,lred2,hred2)
     r_mask |= r_mask2
@@ -91,14 +98,14 @@ while True:
     # white
     # or use 180 as hue upper bound
     # or use 180 instead of 150 VALUE
-    lwhite = np.array([30,0,150])
+    lwhite = np.array([30,10,150])
     hwhite = np.array([150,40,255])
     w_mask = cv.inRange(hsv_frame,lwhite,hwhite)
     white = cv.bitwise_and(frame,frame,mask=w_mask)
 
     # Orange
-    lorange = np.array([4,100,100])
-    horange = np.array([26,255,255])
+    lorange = np.array([10,150,100])
+    horange = np.array([20,255,255])
     o_mask = cv.inRange(hsv_frame,lorange,horange)
     orange = cv.bitwise_and(frame,frame,mask=o_mask)
 
@@ -112,19 +119,19 @@ while True:
 
     
     myContour("yellow",y_mask)
-    # cv.imshow('yellow mask',yellow)
+    cv.imshow('yellow mask',yellow)
 
     myContour("green",g_mask)
-    # cv.imshow('green mask',green)
+    cv.imshow('green mask',green)
 
     myContour("blue",b_mask)
     # cv.imshow('blue mask',blue)
 
     myContour("red",r_mask)
-    # cv.imshow("red mask", red)
+    cv.imshow("red mask", red)
 
     myContour("white",w_mask)
-    # cv.imshow("white mask",white)
+    cv.imshow("white mask",white)
 
     myContour("orange",o_mask)
     # cv.imshow("orange mask",orange)
@@ -143,3 +150,7 @@ while True:
 
 cap.release()
 cv.destroyAllWindows()
+
+# https://docs.opencv.org/4.5.2/d5/d69/tutorial_py_non_local_means.html
+# https://docs.opencv.org/4.5.2/db/d27/tutorial_py_table_of_contents_feature2d.html
+# 
