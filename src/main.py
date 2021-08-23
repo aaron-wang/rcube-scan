@@ -1,26 +1,27 @@
 import numpy as np
 import cv2 as cv
 
-import math
-from math import sin, cos, radians
+# import math
+from math import sin, cos, radians, pi
 
 from constants import *
 
+# cubes: ((x,y), angle)
 cubes = []
-# ((x,y), angle)
+widths = []
 center2 = (0,0)
+
 def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
     return (w > CONTOUR_BYPASS_SCALE * h 
         or h > CONTOUR_BYPASS_SCALE *w 
         or max(w,h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
 
-
-
 cap = cv.VideoCapture(0,cv.CAP_DSHOW)
 
 def create_rotated_image():
+    widths.sort()
     rotate_angle = 0
-    cube_angles = sorted([x[1] for x in cubes])
+    cube_angles = sorted([c[1] for c in cubes])
     mean_angle = sum(cube_angles)
     median_angle = 0
     #get median and average.
@@ -29,7 +30,6 @@ def create_rotated_image():
         median_angle = cube_angles[len(cubes)//2]
         if (median_angle != 0 and abs(mean_angle-median_angle)/median_angle < 0.08):
             # The average angle is more accurate than the median
-            print("AVERAGE USED")
             rotate_angle = mean_angle
         else:
             rotate_angle = median_angle
@@ -40,8 +40,10 @@ def create_rotated_image():
     else:
         height, width = frame.shape[:2]
         r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
-        rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
-        cv.imshow('Rotated image', rotated_image)
+        if (len(widths) >= 1):
+            rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
+            cv.imshow('Rotated image', rotated_image)
+
 
 
 def myContour(colorName, mask):
@@ -62,14 +64,12 @@ def myContour(colorName, mask):
                 # Bypass false detection (strict)
                 if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
                     continue
-
                 #angle
                 angle = (rect[2])
-
                 # Draw min circle
                 (cx,cy),radius = cv.minEnclosingCircle(c)
                 center = (int(cx),int(cy))
-                circ_area = math.pi * radius * radius
+                circ_area = pi * radius * radius
                 radius = int(radius)
                 # FOR CIRCLE CENTER SYTLE RUBIK'S CUBES:
                 # - Detect center circle (instead of perceived square)
@@ -80,7 +80,7 @@ def myContour(colorName, mask):
                 is_circle_center = (circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE*rot_area)
                 if (not is_circle_center):
                     cv.drawContours(frame,[box],0,(0,255,0),2)
-                    pass
+                    widths.append((w2+h2)/2)
                 else:
                     cv.circle(frame,center,radius,(0,0,255),2)
                     # optionally draw rough bounding rectangle for entire cube.
@@ -184,6 +184,8 @@ while True:
     cv.imshow('frame',frame)
     
     cubes.clear()
+    widths.clear()
+
     key = cv.waitKey(5)
     if (key == ord('q')): 
         break
@@ -193,4 +195,3 @@ cv.destroyAllWindows()
 
 # https://docs.opencv.org/4.5.2/d5/d69/tutorial_py_non_local_means.html
 # https://docs.opencv.org/4.5.2/db/d27/tutorial_py_table_of_contents_feature2d.html
-# 
