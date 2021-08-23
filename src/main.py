@@ -1,16 +1,48 @@
 import numpy as np
 import cv2 as cv
 
+import math
+from math import sin, cos, radians
+
 from constants import *
 
+cubes = []
+# ((x,y), angle)
+center2 = (0,0)
 def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
     return (w > CONTOUR_BYPASS_SCALE * h 
         or h > CONTOUR_BYPASS_SCALE *w 
         or max(w,h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
 
-import math
+
 
 cap = cv.VideoCapture(0,cv.CAP_DSHOW)
+
+def create_rotated_image():
+    rotate_angle = 0
+    cube_angles = sorted([x[1] for x in cubes])
+    mean_angle = sum(cube_angles)
+    median_angle = 0
+    #get median and average.
+    if (len(cubes) > 0): 
+        mean_angle /= len(cubes)
+        median_angle = cube_angles[len(cubes)//2]
+        if (median_angle != 0 and abs(mean_angle-median_angle)/median_angle < 0.08):
+            # The average angle is more accurate than the median
+            print("AVERAGE USED")
+            rotate_angle = mean_angle
+        else:
+            rotate_angle = median_angle
+    
+    if (rotate_angle > 45): rotate_angle -= 90
+    if (abs(rotate_angle-45) < 0.5):
+        print("Please rotate cube")
+    else:
+        height, width = frame.shape[:2]
+        r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
+        rotated_image = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
+        cv.imshow('Rotated image', rotated_image)
+
 
 def myContour(colorName, mask):
     contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
@@ -30,6 +62,10 @@ def myContour(colorName, mask):
                 # Bypass false detection (strict)
                 if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
                     continue
+
+                #angle
+                angle = (rect[2])
+
                 # Draw min circle
                 (cx,cy),radius = cv.minEnclosingCircle(c)
                 center = (int(cx),int(cy))
@@ -41,7 +77,8 @@ def myContour(colorName, mask):
                     # ([ ])
                 # Else this is a circle (the smaller circle is enclosed in the square).
                     # [ O ]
-                if (circ_area > CIRCLE_CONTOUR_BYPASS_SCALE*rot_area):
+                is_circle_center = (circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE*rot_area)
+                if (not is_circle_center):
                     cv.drawContours(frame,[box],0,(0,255,0),2)
                     pass
                 else:
@@ -51,6 +88,12 @@ def myContour(colorName, mask):
                         w*=1.3; h*=1.3
                         w = int(w); h = int(h)
                         cv.rectangle(frame,(x-w,y-h),(x+2*w,y+2*h),(255,0,0),2)
+                if (not is_circle_center):
+                    cubes.append(((x,y),angle))
+                else:
+                    global center2
+                    center2 = center
+                
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
                     cv.putText(frame,colorName,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
@@ -66,26 +109,25 @@ while True:
     ret,frame = cap.read()
     hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
 
-    #yellow
-    # or 160 replaces 80
+    # Yellow
     lyellow = np.array([19,100,80])
     uyellow = np.array([40,255,255])
     y_mask = cv.inRange(hsv_frame,lyellow,uyellow)
     yellow = cv.bitwise_and(frame,frame,mask=y_mask)
 
-    #green
-    lgreen = np.array([70,60,10])
+    # Green
+    lgreen = np.array([70,60,80])
     hgreen = np.array([96,255,255])
     g_mask = cv.inRange(hsv_frame,lgreen,hgreen)
     green = cv.bitwise_and(frame,frame,mask=g_mask)
 
-    #blue
+    # Blue
     lblue = np.array([100,97,78])
     hblue = np.array([123,255,255])
     b_mask = cv.inRange(hsv_frame,lblue,hblue)
     blue = cv.bitwise_and(frame,frame,mask=b_mask)
 
-    #red
+    # Red
     lred = np.array([0,135,73])
     hred = np.array([10,255,255])
     r_mask = cv.inRange(hsv_frame,lred,hred)
@@ -95,10 +137,10 @@ while True:
     r_mask |= r_mask2
     red = cv.bitwise_and(frame,frame,mask=r_mask)
 
-    # white
+    # White
     # or use 180 as hue upper bound
     # or use 180 instead of 150 VALUE
-    lwhite = np.array([30,10,150])
+    lwhite = np.array([30,0,150])
     hwhite = np.array([150,40,255])
     w_mask = cv.inRange(hsv_frame,lwhite,hwhite)
     white = cv.bitwise_and(frame,frame,mask=w_mask)
@@ -109,8 +151,6 @@ while True:
     o_mask = cv.inRange(hsv_frame,lorange,horange)
     orange = cv.bitwise_and(frame,frame,mask=o_mask)
 
-
-
     # Black
     lblack = np.array([80,0,0])
     hblack = np.array([100,55,20])
@@ -119,7 +159,7 @@ while True:
 
     
     myContour("yellow",y_mask)
-    cv.imshow('yellow mask',yellow)
+    # cv.imshow('yellow mask',yellow)
 
     myContour("green",g_mask)
     cv.imshow('green mask',green)
@@ -128,10 +168,10 @@ while True:
     # cv.imshow('blue mask',blue)
 
     myContour("red",r_mask)
-    cv.imshow("red mask", red)
+    # cv.imshow("red mask", red)
 
     myContour("white",w_mask)
-    cv.imshow("white mask",white)
+    # cv.imshow("white mask",white)
 
     myContour("orange",o_mask)
     # cv.imshow("orange mask",orange)
@@ -139,11 +179,11 @@ while True:
     myContour("black",black_mask)
     # cv.imshow("black mask",black)
 
-
+    create_rotated_image()
 
     cv.imshow('frame',frame)
-
-    # HS V - hue, saturation, value (brightness)
+    
+    cubes.clear()
     key = cv.waitKey(5)
     if (key == ord('q')): 
         break
