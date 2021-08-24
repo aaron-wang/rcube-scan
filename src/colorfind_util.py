@@ -2,14 +2,13 @@ import cv2 as cv
 import numpy as np
 
 color = np.uint8([[[
-#    84,60,52
+    # 84,60,52
     # 76,52,36
     # 52,36,28
     # 36,36,58
     # 192,207,204
-    60,77,20
+    60, 77, 20
 ]]])
-
 
 
 hsv_color = cv.cvtColor(color, cv.COLOR_BGR2HSV)
@@ -19,7 +18,7 @@ hsv_color = cv.cvtColor(color, cv.COLOR_BGR2HSV)
 
 # hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
 
-# mask = cv.inRange(hsv, 
+# mask = cv.inRange(hsv,
 #     (0,100,76),
 #     (10,255,255)
 # )

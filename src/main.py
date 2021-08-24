@@ -1,208 +1,260 @@
 import numpy as np
 import cv2 as cv
 
-# import math
-from math import sin, cos, radians, pi
+import json
+import copy
 
+from math import pi
 from constants import *
-
-import json, time, copy
 
 # cubes: ((x,y), angle)
 cubes = []
-widths = []
-center2 = (0,0)
-
+# widths = []
+center_cube = (0, 0)
 rotate_success = True
 
-cap = cv.VideoCapture(0,cv.CAP_DSHOW)
 
-def contour_bypass(w,h,CONTOUR_BYPASS_SCALE):
-    return (w > CONTOUR_BYPASS_SCALE * h 
-        or h > CONTOUR_BYPASS_SCALE *w 
-        or max(w,h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
+def contour_bypass(w, h, CONTOUR_BYPASS_SCALE) -> bool:
+    '''
+    Checks if contour shape is square-like
+    '''
+    return (w > CONTOUR_BYPASS_SCALE * h
+            or h > CONTOUR_BYPASS_SCALE * w
+            or max(w, h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
 
-def simple_rotated_contour(color,mask):
-    contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
-    if (len(contours) >= 1):
-        text_color = (0,0,255)
-        for c in contours:
-            if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
-                x, y, w, h = cv.boundingRect(c)
-                if (contour_bypass(w,h,LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)): 
-                    continue
-                rect = cv.minAreaRect(c)
-                w2, h2 = rect[1]; 
-                box = cv.boxPoints(rect); box = np.int0(box)
-                # Bypass false detection (strict)
-                if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
-                    continue
-                #angle
-                cv.rectangle(rotated_frame,(x,y),(x+w,y+h),(0,0,255),2)
-                # Draw text color name
-                if (SHOW_CONTOUR_COLOR_TEXT):
-                    cv.putText(rotated_frame,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
 
-                # Contour approximation based on the Douglas - Peucker algorithm
-                # over simplification: turn a curve into a similar one with less points.
-                epsilon = 0.1*cv.arcLength(c,True)
-                approx = cv.approxPolyDP(c,epsilon,True)
-                cv.drawContours(rotated_frame,approx,-1,(0,255,0),3)
+def simple_rotated_contour(color, mask):
+    '''
+    (deprecated) generate simple rotated contour
+    '''
+    contours, hierarchy = cv.findContours(
+        mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    if (len(contours) < 1):
+        return False
+    text_color = (0, 0, 255)
+    for c in contours:
+        if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
+            x, y, w, h = cv.boundingRect(c)
+            if (contour_bypass(w, h, LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)):
+                continue
+            rect = cv.minAreaRect(c)
+            w2, h2 = rect[1]
+            box = cv.boxPoints(rect)
+            box = np.int0(box)
+            # Bypass false detection (strict)
+            if (contour_bypass(w2, h2, STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
+                continue
+            # angle
+            cv.rectangle(rotated_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # Draw text color name
+            if (SHOW_CONTOUR_COLOR_TEXT):
+                cv.putText(rotated_frame, color, (x + 7, y + h // 2),
+                           cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+            # Contour approximation based on the Douglas-Peucker algorithm
+            # abstraction: turn a curve into a similar one with less points.
+            epsilon = 0.1 * cv.arcLength(c, True)
+            approx = cv.approxPolyDP(c, epsilon, True)
+            cv.drawContours(rotated_frame, approx, -1, (0, 255, 0), 3)
+
+
 def create_rotated_frame(frame):
+    '''
+    Generate rotated frame from passed frame
+    '''
     global rotated_frame, rotate_success
-    widths.sort()
+    # widths.sort()
     rotate_angle = 0
     cube_angles = sorted([c[1] for c in cubes])
     mean_angle = sum(cube_angles)
     median_angle = 0
-    #get median and average.
-    if (len(cubes) > 0): 
+    # get median and average.
+    if (len(cubes) > 0):
         mean_angle /= len(cubes)
-        median_angle = cube_angles[len(cubes)//2]
-        if (median_angle != 0 and abs(mean_angle-median_angle)/median_angle < 0.08):
+        median_angle = cube_angles[len(cubes) // 2]
+        if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
             # The average angle is more accurate than the median
             rotate_angle = mean_angle
         else:
             rotate_angle = median_angle
-    
-    if (rotate_angle > 45): rotate_angle -= 90
-    if (abs(rotate_angle-45) < 1.0):
+    # Prevent inaccuracies when cube angle is uncertain
+    # (two orientations with near likely probability)
+    if (abs(rotate_angle - 45) < 1.0):
         print("Please rotate cube")
         rotate_success = False
     else:
+        if (rotate_angle > 45):
+            rotate_angle -= 90
         height, width = frame.shape[:2]
-        r_matrix = cv.getRotationMatrix2D(center=center2, angle=rotate_angle, scale=1)
-        # if (len(widths) >= 1):
-        rotated_frame = cv.warpAffine(src=frame, M=r_matrix, dsize=(width, height))
+        r_matrix = cv.getRotationMatrix2D(
+            center=center_cube, angle=rotate_angle, scale=1)
+        rotated_frame = cv.warpAffine(
+            src=frame, M=r_matrix, dsize=(width, height))
 
-def create_contour_preview(frame,window_name,mask):
-    preview_frame = cv.bitwise_and(frame,frame,mask=mask)
-    cv.imshow(window_name,preview_frame)
 
-def draw_cube_contour(frame,color, mask):
-    contours, hierarchy = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+def create_contour_preview(frame, window_name, mask):
+    '''
+    Create contour preview from given frame and mask
+    '''
+    preview_frame = cv.bitwise_and(frame, frame, mask=mask)
+    cv.imshow(window_name, preview_frame)
+
+
+def draw_cube_contour(frame, color, mask):
+    '''
+    Draw contours with rotated rectangles and circles.
+
+    Displays detected colors in text (if `SHOW_CONTOUR_COLOR_TEXT`)
+
+    ### Circle Detection
+
+    Detect center circle (instead of perceived square)
+
+    - If the bounding circle is "larger" than the square
+        - then this is a square. ([ ])
+
+    - Else this is a circle
+        - (the smaller circle is enclosed in the square). [ 0 ]
+
+    *for circle center sytle rubik's cubes*
+    '''
+    contours, hierarchy = cv.findContours(
+        mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     if (len(contours) >= 1):
-        text_color = (255,255,255)
-        if (color=="yellow" or color == "white"): text_color = (0,0,0)
+        text_color = (255, 255, 255)
+        if (color == "yellow" or color == "white"):
+            text_color = (0, 0, 0)
         for c in contours:
             if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
                 x, y, w, h = cv.boundingRect(c)
                 # Bypass false detection (short ciruit)
-                if (contour_bypass(w,h,LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)): 
+                if (contour_bypass(w, h, LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)):
                     continue
                 # Generate rotated rectangle
                 rect = cv.minAreaRect(c)
-                w2, h2 = rect[1]; rot_area = w2 * h2
-                box = cv.boxPoints(rect); box = np.int0(box)
+                w2, h2 = rect[1]
+                rot_area = w2 * h2
+                box = cv.boxPoints(rect)
+                box = np.int0(box)
                 # Bypass false detection (strict)
-                if (contour_bypass(w2,h2,STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
+                if (contour_bypass(w2, h2, STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
                     continue
-                #angle
+                # angle
                 angle = (rect[2])
                 # Draw min circle
-                (cx,cy),radius = cv.minEnclosingCircle(c)
-                center = (int(cx),int(cy))
+                (cx, cy), radius = cv.minEnclosingCircle(c)
+                center = (int(cx), int(cy))
                 circ_area = pi * radius * radius
                 radius = int(radius)
-                # FOR CIRCLE CENTER SYTLE RUBIK'S CUBES:
-                # - Detect center circle (instead of perceived square)
-                # If the bounding circle is "larger" than the square then this is a square.
-                    # ([ ])
-                # Else this is a circle (the smaller circle is enclosed in the square).
-                    # [ O ]
-                is_circle_center = (circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE*rot_area)
+
+                is_circle_center = (
+                    circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE * rot_area)
                 if (not is_circle_center):
-                    cv.drawContours(frame,[box],0,(0,255,0),2)
-                    widths.append((w2+h2)/2)
+                    cv.drawContours(frame, [box], 0, (0, 255, 0), 2)
+                    # widths.append((w2+h2)/2)
                 else:
-                    cv.circle(frame,center,radius,(0,0,255),2)
+                    cv.circle(frame, center, radius, (0, 0, 255), 2)
                     # optionally draw rough bounding rectangle for entire cube.
                     if (SHOW_ENTIRE_BOUNDING_RECTANGLE):
-                        w*=1.3; h*=1.3
-                        w = int(w); h = int(h)
-                        cv.rectangle(frame,(x-w,y-h),(x+2*w,y+2*h),(255,0,0),2)
+                        w *= 1.3
+                        h *= 1.3
+                        w = int(w)
+                        h = int(h)
+                        cv.rectangle(frame, (x - w, y - h),
+                                     (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
                 if (not is_circle_center):
-                    cubes.append(((x,y),angle))
+                    cubes.append(((x, y), angle))
                 else:
-                    global center2
-                    center2 = center
-                
+                    global center_cube
+                    center_cube = center
+
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
-                    cv.putText(frame,color,(x+7,y+h//2),cv.FONT_HERSHEY_SIMPLEX,0.5,text_color,1)
-                
+                    cv.putText(frame, color, (x + 7, y + h // 2),
+                               cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
                 # Contour approximation based on the Douglas - Peucker algorithm
                 # over simplification: turn a curve into a similar one with less points.
-                epsilon = 0.1*cv.arcLength(c,True)
-                approx = cv.approxPolyDP(c,epsilon,True)
-                cv.drawContours(frame,approx,-1,(0,255,0),3)
-                
+                epsilon = 0.1 * cv.arcLength(c, True)
+                approx = cv.approxPolyDP(c, epsilon, True)
+                cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
+
 
 with open("config.json") as f:
     data = json.load(f)
 
-colors = ['yellow', 'green', 'blue', 'red', 'white', 'orange']
-
+COLORS = ['yellow', 'green', 'blue', 'red', 'white', 'orange']
 
 HSV_BOUND = dict()
-for c in colors:
-    HSV_BOUND[c] = (np.array(data['colors'][c]['lower_bound']),np.array(data['colors'][c]['upper_bound']))
 
-RED_UNION_BOUND = (np.array(data['colors']['red']['lower_bound2']),np.array(data['colors']['red']['upper_bound2']))
+for c in COLORS:
+    HSV_BOUND[c] = (np.array(data['colors'][c]['lower_bound']),
+                    np.array(data['colors'][c]['upper_bound']))
+
+HSV_RED_UNION_BOUND = (
+    np.array(data['colors']['red']['lower_bound2']),
+    np.array(data['colors']['red']['upper_bound2']))
 
 masks = list()
 rotated_masks = list()
 
-while True:
-    ret,frame = cap.read()
+cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
-    ### Main color recognition
+while True:
+    ret, frame = cap.read()
+
+    # Main color recognition
 
     # Convert from BGR to HSV colorspace.
-    hsv_frame = cv.cvtColor(frame,cv.COLOR_BGR2HSV) 
-    
+    hsv_frame = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+
     # Generate masks.
-    masks = dict((c,cv.inRange(hsv_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
-    masks['red'] |= cv.inRange(hsv_frame,*RED_UNION_BOUND)
-    
-    # if (SHOW_CONTOUR_PREVIEW):
+    masks = dict(
+        (c, cv.inRange(hsv_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
+    masks['red'] |= cv.inRange(hsv_frame, *HSV_RED_UNION_BOUND)
+
     original_frame = copy.copy(frame)
 
-    for c in colors:
-        draw_cube_contour(frame,c,masks[c])
+    for c in COLORS:
+        draw_cube_contour(frame, c, masks[c])
         if SHOW_CONTOUR_PREVIEW:
-            create_contour_preview(original_frame,c,masks[c])
+            create_contour_preview(original_frame, c, masks[c])
             pass
 
-    ### Handle rotated recognition.
+    # Handle rotated recognition.
 
     create_rotated_frame(original_frame)
+
     if (rotate_success):
-        # convert 
-        hsv_rotated_frame = cv.cvtColor(rotated_frame,cv.COLOR_BGR2HSV)
+        # print("SUCCESS")
+        # convert
+        hsv_rotated_frame = cv.cvtColor(rotated_frame, cv.COLOR_BGR2HSV)
         # generate masks.
-        rotated_masks = dict((c,cv.inRange(hsv_rotated_frame,HSV_BOUND[c][0],HSV_BOUND[c][1])) for c in colors)
-        rotated_masks['red'] |= cv.inRange(hsv_rotated_frame,*RED_UNION_BOUND)
-        
+        rotated_masks = dict((c, cv.inRange(
+            hsv_rotated_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
+        rotated_masks['red'] |= cv.inRange(
+            hsv_rotated_frame, *HSV_RED_UNION_BOUND)
+
         if (SHOW_CONTOUR_PREVIEW):
             original_rotated_frame = copy.copy(rotated_frame)
 
-        for c in colors:
-            draw_cube_contour(rotated_frame,c,rotated_masks[c])
+        for c in COLORS:
+            draw_cube_contour(rotated_frame, c, rotated_masks[c])
             if (SHOW_CONTOUR_PREVIEW):
-                create_contour_preview(original_rotated_frame,c,rotated_masks[c])
-                pass
+                create_contour_preview(
+                    original_rotated_frame, c, rotated_masks[c])
         cv.imshow('Rotated image', rotated_frame)
     rotate_success = True
 
-    cv.imshow('frame',frame)
-    
+    cv.imshow('frame', frame)
+
     cubes.clear()
-    widths.clear()
+    # widths.clear()
 
     key = cv.waitKey(5)
-    if (key == ord('q')): 
+    if (key == ord('q')):
         break
+
 # End process
 cap.release()
 cv.destroyAllWindows()

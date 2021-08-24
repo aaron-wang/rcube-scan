@@ -115,3 +115,7 @@ dmypy.json
 
 src/img/**
 src/vid/**
+
+.pylintrc
+
+.vscode
