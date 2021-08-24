@@ -11,7 +11,6 @@ from constants import *
 cubes = []
 # widths = []
 center_cube = (0, 0)
-rotate_success = True
 
 
 def contour_bypass(w, h, CONTOUR_BYPASS_SCALE) -> bool:
@@ -23,46 +22,11 @@ def contour_bypass(w, h, CONTOUR_BYPASS_SCALE) -> bool:
             or max(w, h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
 
 
-def simple_rotated_contour(color, mask):
-    '''
-    (deprecated) generate simple rotated contour
-    '''
-    contours, hierarchy = cv.findContours(
-        mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    if (len(contours) < 1):
-        return False
-    text_color = (0, 0, 255)
-    for c in contours:
-        if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
-            x, y, w, h = cv.boundingRect(c)
-            if (contour_bypass(w, h, LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)):
-                continue
-            rect = cv.minAreaRect(c)
-            w2, h2 = rect[1]
-            box = cv.boxPoints(rect)
-            box = np.int0(box)
-            # Bypass false detection (strict)
-            if (contour_bypass(w2, h2, STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
-                continue
-            # angle
-            cv.rectangle(rotated_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-            # Draw text color name
-            if (SHOW_CONTOUR_COLOR_TEXT):
-                cv.putText(rotated_frame, color, (x + 7, y + h // 2),
-                           cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-            # Contour approximation based on the Douglas-Peucker algorithm
-            # abstraction: turn a curve into a similar one with less points.
-            epsilon = 0.1 * cv.arcLength(c, True)
-            approx = cv.approxPolyDP(c, epsilon, True)
-            cv.drawContours(rotated_frame, approx, -1, (0, 255, 0), 3)
-
-
 def create_rotated_frame(frame):
     '''
     Generate rotated frame from passed frame
     '''
-    global rotated_frame, rotate_success
+    global rotated_frame
     # widths.sort()
     rotate_angle = 0
     cube_angles = sorted([c[1] for c in cubes])
@@ -81,7 +45,7 @@ def create_rotated_frame(frame):
     # (two orientations with near likely probability)
     if (abs(rotate_angle - 45) < 1.0):
         print("Please rotate cube")
-        rotate_success = False
+        return False
     else:
         if (rotate_angle > 45):
             rotate_angle -= 90
@@ -90,6 +54,7 @@ def create_rotated_frame(frame):
             center=center_cube, angle=rotate_angle, scale=1)
         rotated_frame = cv.warpAffine(
             src=frame, M=r_matrix, dsize=(width, height))
+        return True
 
 
 def create_contour_preview(frame, window_name, mask):
@@ -203,6 +168,7 @@ cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 while True:
     ret, frame = cap.read()
 
+    original_frame = copy.copy(frame)
     # Main color recognition
 
     # Convert from BGR to HSV colorspace.
@@ -213,22 +179,16 @@ while True:
         (c, cv.inRange(hsv_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
     masks['red'] |= cv.inRange(hsv_frame, *HSV_RED_UNION_BOUND)
 
-    original_frame = copy.copy(frame)
-
     for c in COLORS:
         draw_cube_contour(frame, c, masks[c])
         if SHOW_CONTOUR_PREVIEW:
             create_contour_preview(original_frame, c, masks[c])
-            pass
-
     # Handle rotated recognition.
 
-    create_rotated_frame(original_frame)
-
-    if (rotate_success):
-        # print("SUCCESS")
+    if (create_rotated_frame(original_frame)):
         # convert
         hsv_rotated_frame = cv.cvtColor(rotated_frame, cv.COLOR_BGR2HSV)
+
         # generate masks.
         rotated_masks = dict((c, cv.inRange(
             hsv_rotated_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
@@ -244,7 +204,6 @@ while True:
                 create_contour_preview(
                     original_rotated_frame, c, rotated_masks[c])
         cv.imshow('Rotated image', rotated_frame)
-    rotate_success = True
 
     cv.imshow('frame', frame)
 
