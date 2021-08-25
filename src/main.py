@@ -7,9 +7,12 @@ import copy
 from math import pi
 from constants import *
 
-# cubes: ((x,y), angle)
-cubes = []
-# widths = []
+# cube_angles = (angle)
+cube_angles = []
+
+# cubes: ((x,y),'color')
+ortho_cubes = []
+
 center_cube = (0, 0)
 
 
@@ -24,23 +27,24 @@ def contour_bypass(w, h, CONTOUR_BYPASS_SCALE) -> bool:
 
 def create_rotated_frame(frame):
     '''
-    Generate rotated frame from passed frame
+    Make detected cube orthogonal (rotates frame)
     '''
     global rotated_frame
-    # widths.sort()
     rotate_angle = 0
-    cube_angles = sorted([c[1] for c in cubes])
+    cube_angles.sort
     mean_angle = sum(cube_angles)
     median_angle = 0
     # get median and average.
-    if (len(cubes) > 0):
-        mean_angle /= len(cubes)
-        median_angle = cube_angles[len(cubes) // 2]
+    if (len(cube_angles) == 8):
+        mean_angle /= len(cube_angles)
+        median_angle = cube_angles[len(cube_angles) // 2]
         if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
             # The average angle is more accurate than the median
             rotate_angle = mean_angle
         else:
             rotate_angle = median_angle
+    else:
+        return False
     # Prevent inaccuracies when cube angle is uncertain
     # (two orientations with near likely probability)
     if (abs(rotate_angle - 45) < 1.0):
@@ -59,13 +63,13 @@ def create_rotated_frame(frame):
 
 def create_contour_preview(frame, window_name, mask):
     '''
-    Create contour preview from given frame and mask
+    Create weak contour preview based on mask
     '''
     preview_frame = cv.bitwise_and(frame, frame, mask=mask)
     cv.imshow(window_name, preview_frame)
 
 
-def draw_cube_contour(frame, color, mask):
+def draw_cube_contour(frame, color, mask, is_rotated = False):
     '''
     Draw contours with rotated rectangles and circles.
 
@@ -127,11 +131,14 @@ def draw_cube_contour(frame, color, mask):
                         h = int(h)
                         cv.rectangle(frame, (x - w, y - h),
                                      (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
-                if (not is_circle_center):
-                    cubes.append(((x, y), angle))
+                if is_rotated:
+                    ortho_cubes.append(((x,y),color))
                 else:
-                    global center_cube
-                    center_cube = center
+                    if (not is_circle_center):
+                        cube_angles.append(angle)
+                    else:
+                        global center_cube
+                        center_cube = center
 
                 # Draw text color name
                 if (SHOW_CONTOUR_COLOR_TEXT):
@@ -144,6 +151,13 @@ def draw_cube_contour(frame, color, mask):
                 approx = cv.approxPolyDP(c, epsilon, True)
                 cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
 
+
+def process_cube(frame):
+    '''
+    Determine which colors map where on the cube
+    '''
+
+    pass
 
 with open("config.json") as f:
     data = json.load(f)
@@ -162,6 +176,13 @@ HSV_RED_UNION_BOUND = (
 
 masks = list()
 rotated_masks = list()
+
+freq_cube = dict()
+for c in COLORS:
+    freq_cube[c] = [[0 for i in range(3)] for j in range(3)]
+
+max_cube = [[0 for i in range(3)] for j in range(3)]
+max_color = [['X' for i in range(3)] for j in range(3)]
 
 cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
@@ -199,24 +220,56 @@ while True:
             original_rotated_frame = copy.copy(rotated_frame)
 
         for c in COLORS:
-            draw_cube_contour(rotated_frame, c, rotated_masks[c])
+            draw_cube_contour(rotated_frame, c, rotated_masks[c],True)
             if (SHOW_CONTOUR_PREVIEW):
+                # create_contour_preview(
+                    # original_rotated_frame, c, rotated_masks[c])
                 create_contour_preview(
-                    original_rotated_frame, c, rotated_masks[c])
+                    rotated_frame, c, rotated_masks[c])
         cv.imshow('Rotated image', rotated_frame)
+    else:
+        print("paused")
+        # for c in COLORS:
+            # freq_cube[c] = [[0 for i in range(3)] for j in range(3)]
 
     cv.imshow('frame', frame)
+    # sort by y value
+    # then by x value
+    ortho_cubes.sort(key=lambda x: (x[0][1]))
+    for i in range(0,6+1,3):
+        print(i)
+        ortho_cubes[i:i+3] = sorted(ortho_cubes[i:i+3],key=lambda x: x[0][0])
+    print(ortho_cubes)
+    if (len(ortho_cubes) == 9):
+        for i in range(3):
+            for j in range(3):
+                color = ortho_cubes[3*i + j][1]
+                # print(ortho_cubes[3*i + j][1][0], f"({freq_cube[color][i][j]})", end=' ')
+                freq_cube[color][i][j]+=1
+                max_color[i][j] = ortho_cubes[3*i + j][1]
 
-    cubes.clear()
+                if (freq_cube[color][i][j] > max_cube[i][j]):
+                    max_cube[i][j] = freq_cube[color][i][j]
+                    max_color[i][j] = color
+                    
+                print(max_color[i][j], f"({max_cube[i][j]})", end=' ')
+
+            print()
+    print("-------")
+    
+    cube_angles.clear()
+    ortho_cubes.clear()
     # widths.clear()
-
     key = cv.waitKey(5)
     if (key == ord('q')):
         break
-
 # End process
 cap.release()
 cv.destroyAllWindows()
 
 # https://docs.opencv.org/4.5.2/d5/d69/tutorial_py_non_local_means.html
 # https://docs.opencv.org/4.5.2/db/d27/tutorial_py_table_of_contents_feature2d.html
+
+# https://scikit-image.org/docs/stable/
+# https://www.pyimagesearch.com/2021/02/15/automatic-color-correction-with-opencv-and-python/
+# https://www.pyimagesearch.com/2014/08/04/opencv-python-color-detection/
