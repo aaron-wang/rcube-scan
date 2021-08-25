@@ -119,3 +119,4 @@ src/vid/**
 .pylintrc
 
 .vscode
+tempCodeRunnerFile.py

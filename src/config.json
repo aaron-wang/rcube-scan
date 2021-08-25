@@ -1,4 +1,5 @@
 {
+    "hasCircleCenter":"false",
     "colors": {
         "yellow": {
             "lower_bound": [

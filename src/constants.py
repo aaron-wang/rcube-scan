@@ -12,3 +12,18 @@ LENIENT_SQUARE_CONTOUR_BYPASS_RATIO = 1.3
 STRICT_SQUARE_CONTOUR_BYPASS_RATIO = 1.2
 # Determine circle bounding - comparison with bounded square
 CIRCLE_CONTOUR_BYPASS_SCALE = 1.1
+# Rotation angle clemency
+ANGLE_EPSILON = 1.0
+
+# CUBE MAPPING
+# How many frame readings of a color required before 
+# locking color reading for this cube side/face.
+# Dependent on system
+MIN_TOTAL_READING = 30
+
+MAX_TOTAL_READING = 60
+
+# If after MIN_COLOR_FREQUENCY number of readings, all
+# colors have at least this percentage of confidence.
+MIN_COLOR_CONFIDENCE_THRESHOLD = 0.80
+
