@@ -7,19 +7,77 @@ import copy
 from math import pi
 from constants import *
 
+
+class CubeMap:
+    nxt = {
+        0: 5,
+        1: 0,
+        2: 3,
+        3: 4,
+        4: 1,
+        5: -1
+    }
+    bk = {
+        0: 1,
+        1: 4,
+        2: -1,
+        3: 2,
+        4: 3,
+        5: 0
+    }
+
+    index = 2
+
+    total_readings = 0
+
+    # cubes: ((x,y),'color')
+    ortho = []
+
+    # Map of cube faces.
+    map = [[['_' for col in range(3)]
+            for row in range(3)] for colors in range(6)]
+
+    class color:
+        freq = dict()
+
+        max_freq = [[0 for i in range(3)] for j in range(3)]
+
+        name = [['X' for i in range(3)] for j in range(3)]
+
+        from_index = ['b', 'w', 'r', 'y', 'o', 'g']
+
+    def __init__(self) -> None:
+        pass
+
+    def print_subcube(index):
+        if (index == 0 or index == 5):
+            for row in range(3):
+                for col in range(2 * 3):
+                    if (col < 3):
+                        print(' ', end=' ')
+                    else:
+                        print(CubeMap.map[index][row][col % 3], end=' ')
+                print()
+        else:
+            for row in range(3):
+                for col in range(4 * 3):
+                    curr_dim = col//3 + 1
+                    print(CubeMap.map[curr_dim][row][col % 3], end=' ')
+                print()
+
+    def print_text_cube_map():
+        CubeMap.print_subcube(0)
+        CubeMap.print_subcube(1)
+        CubeMap.print_subcube(5)
+
+
 # cube_angles = (angle)
 cube_angles = []
 
-# cubes: ((x,y),'color')
-ortho_cubes = []
-
-total_readings = 0
 
 center_cube = (0, 0)
 
-cube_map = [[['_' for col in range(3)] for row in range(3)] for colors in range(6)]
 
-current_cube_map_index = 2
 #   B
 # W R Y O
 #   G
@@ -28,37 +86,6 @@ current_cube_map_index = 2
 # 1 2 3 4
 #   5
 
-
-# R R R
-# R R R
-# R R R
-
-def print_cube(index):
-    if (index == 0 or index == 5):
-        #print empty cube
-        for row in range(3):
-            for col in range(2 * 3):
-                if (col < 3):
-                    print(' ',end=' ')
-                else:
-                    print(cube_map[index][row][col%3],end=' ')
-            print()
-    else:
-        for row in range(3):
-            for col in range(4 * 3):
-                curr_dim = col//3 + 1
-                # print(curr_dim)
-                print(cube_map[curr_dim][row][col%3],end=' ')
-                # 0 1 2 
-                # 3 4 5
-            print()
-
-def print_text_cube_map():
-    print_cube(0)
-    print_cube(1)
-    print_cube(5)
-    pass
-# exit()
 with open("config.json") as f:
     data = json.load(f)
 
@@ -80,12 +107,8 @@ HSV_RED_UNION_BOUND = (
 masks = list()
 rotated_masks = list()
 
-freq_cube = dict()
 for c in COLORS:
-    freq_cube[c] = [[0 for i in range(3)] for j in range(3)]
-
-max_cube = [[0 for i in range(3)] for j in range(3)]
-max_color = [['X' for i in range(3)] for j in range(3)]
+    CubeMap.color.freq[c] = [[0 for i in range(3)] for j in range(3)]
 
 
 def contour_bypass(w, h, CONTOUR_BYPASS_SCALE) -> bool:
@@ -203,7 +226,7 @@ def draw_cube_contour(frame, color, mask, is_rotated=False):
                         cv.rectangle(frame, (x - w, y - h),
                                      (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
                 if is_rotated:
-                    ortho_cubes.append(((x, y), color))
+                    CubeMap.ortho.append(((x, y), color))
                 else:
                     if (not is_circle_center):
                         cube_angles.append(angle)
@@ -222,87 +245,85 @@ def draw_cube_contour(frame, color, mask, is_rotated=False):
                 approx = cv.approxPolyDP(c, epsilon, True)
                 cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
 
-def reset_mapping():
-    global max_cube, max_color, freq_cube
-    global total_readings
 
-    total_readings = 0
+def reset_mapping():
+    CubeMap.total_readings = 0
 
     for c in COLORS:
-        freq_cube[c] = [[0 for i in range(3)] for j in range(3)]
+        CubeMap.color.freq[c] = [[0 for i in range(3)] for j in range(3)]
 
-    max_cube = [[0 for i in range(3)] for j in range(3)]
-    max_color = [['X' for i in range(3)] for j in range(3)]
+    CubeMap.color.max_freq = [[0 for i in range(3)] for j in range(3)]
+    CubeMap.color.name = [['X' for i in range(3)] for j in range(3)]
+
 
 def color_mapping_frequency_success():
-    if (total_readings < MIN_TOTAL_READING): 
+    if (CubeMap.total_readings < MIN_TOTAL_READING_BUFFER):
         return False
     for i in range(3):
         for j in range(3):
-            if (max_cube[i][j]/total_readings < MIN_COLOR_CONFIDENCE_THRESHOLD):
+            if (CubeMap.color.max_freq[i][j]/CubeMap.total_readings < MIN_COLOR_CONFIDENCE_THRESHOLD):
                 return False
             else:
                 pass
     return True
 
+
 def process_cube():
     '''
     Determine which colors map where on the cube
     '''
-    global current_cube_map_index
+    # global CubeMap.index
     # sort by y value
     # then chunk in groups of 3:
     # sort by x value for each respective group
-    global total_readings
-    if (total_readings > MAX_TOTAL_READING):
+    if (CubeMap.total_readings > MAX_TOTAL_READING_BUFFER):
         reset_mapping()
-    if (len(ortho_cubes) < 9 or len(ortho_cubes) > 9):
+    if (len(CubeMap.ortho) < 9 or len(CubeMap.ortho) > 9):
         return False
-    ortho_cubes.sort(key=lambda x: (x[0][1]))
-    for i in range(0, 6+1, 3):
-        ortho_cubes[i:i+3] = sorted(ortho_cubes[i:i+3], key=lambda x: x[0][0])
+    CubeMap.ortho.sort(key=lambda x: (x[0][1]))
+    for row in range(0, 6+1, 3):
+        CubeMap.ortho[row:row +
+                      3] = sorted(CubeMap.ortho[row:row+3], key=lambda x: x[0][0])
 
-    total_readings += 1
-    
-    # print(ortho_cubes)
-    # if (len(ortho_cubes) == 9):
-    for i in range(3):
-        for j in range(3):
-            color = ortho_cubes[3*i + j][1]
-            freq_cube[color][i][j] += 1
+    center_color = CubeMap.ortho[3*1 + 1][1]
+    # print(center_color)
 
-            if (freq_cube[color][i][j] > max_cube[i][j]):
-                max_cube[i][j] = freq_cube[color][i][j]
-                max_color[i][j] = color
+    if (center_color[0] == CubeMap.color.from_index[CubeMap.bk[CubeMap.index]]):
+        print("OLD POSITION: PLEASE MOVE CUBE")
+        return False
+    if (center_color[0] != CubeMap.color.from_index[CubeMap.index]):
+        print(
+            f"WRONG STARTING COLOR: start on {CubeMap.color.from_index[CubeMap.index]}")
+        for row in range(3):
+            for col in range(3):
+                print(CubeMap.ortho[3*row+col][1], end=' ')
+            print()
+        return False
 
-            # print(f"{max_color[i][j]} \t ({max_cube[i][j]})", end=' ')
-            # print(f"{max_color[i][j]} \t ({max_cube[i][j]/total_readings:.2f})", end=' ')
+    for row in range(3):
+        for col in range(3):
+            current_color = CubeMap.ortho[3*row + col][1]
+            CubeMap.color.freq[current_color][row][col] += 1
 
-        # print()
-    # print("TOT: ",total_readings)
-    # print("-------")
-    
+            current_color_freq = CubeMap.color.freq[current_color][row][col]
+
+            if (current_color_freq > CubeMap.color.max_freq[row][col]):
+                CubeMap.color.max_freq[row][col] = current_color_freq
+                CubeMap.color.name[row][col] = current_color
+
+    CubeMap.total_readings += 1
+    print(CubeMap.total_readings)
     if(color_mapping_frequency_success()):
-        for i in range(3):
-            for j in range(3):
-                cube_map[current_cube_map_index][i][j] = max_color[i][j][0]
-        print_text_cube_map()
+        for row in range(3):
+            for col in range(3):
+                CubeMap.map[CubeMap.index][row][col] = CubeMap.color.name[row][col][0]
+        CubeMap.print_text_cube_map()
         reset_mapping()
-        print(current_cube_map_index)
-        if (current_cube_map_index == 4): 
-            current_cube_map_index = 1
-        elif (current_cube_map_index == 1):
-            current_cube_map_index = 0
-        elif (current_cube_map_index == 0):
-            current_cube_map_index = 5
-        elif (current_cube_map_index == 5):
+
+        CubeMap.index = CubeMap.nxt[CubeMap.index]
+
+        if (CubeMap.index == -1):
             exit()
-        else:
-            current_cube_map_index+=1
-        
-
-        # exit()
-
 
 
 cap = cv.VideoCapture(0, cv.CAP_DSHOW)
@@ -349,7 +370,8 @@ while True:
                     rotated_frame, c, rotated_masks[c])
         cv.imshow('Rotated image', rotated_frame)
     else:
-        print("paused")
+        # print("paused")
+        pass
         # for c in COLORS:
         # freq_cube[c] = [[0 for i in range(3)] for j in range(3)]
 
@@ -358,7 +380,7 @@ while True:
     process_cube()
 
     cube_angles.clear()
-    ortho_cubes.clear()
+    CubeMap.ortho.clear()
 
     key = cv.waitKey(1)
     if (key == ord('q')):
@@ -373,4 +395,3 @@ cv.destroyAllWindows()
 # https://scikit-image.org/docs/stable/
 # https://www.pyimagesearch.com/2021/02/15/automatic-color-correction-with-opencv-and-python/
 # https://www.pyimagesearch.com/2014/08/04/opencv-python-color-detection/
-

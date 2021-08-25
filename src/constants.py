@@ -19,11 +19,15 @@ ANGLE_EPSILON = 1.0
 # How many frame readings of a color required before 
 # locking color reading for this cube side/face.
 # Dependent on system
-MIN_TOTAL_READING = 30
+MIN_TOTAL_READING_BUFFER = 10
 
-MAX_TOTAL_READING = 60
+# 30 for slower
+
+MAX_TOTAL_READING_BUFFER = 40
+# 60 for slower
+
 
 # If after MIN_COLOR_FREQUENCY number of readings, all
 # colors have at least this percentage of confidence.
-MIN_COLOR_CONFIDENCE_THRESHOLD = 0.80
+MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
 
