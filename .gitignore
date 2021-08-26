@@ -122,6 +122,6 @@ src/vid/**
 tempCodeRunnerFile.py
 workspace.code-workspace
 
-src/test.py
-src/test2.py
-src/test3.py
+test.py
+test2.py
+test3.py
