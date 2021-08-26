@@ -25,11 +25,12 @@ class CubeMap:
         4: 3,
         5: 0
     }
+
     class Color:
-        
+
         def __init__(self) -> None:
             pass
-        
+
         freq = dict()
 
         max_freq = [[0 for i in range(3)] for j in range(3)]
@@ -37,6 +38,7 @@ class CubeMap:
         name = [['X' for i in range(3)] for j in range(3)]
 
         from_index = ['b', 'w', 'r', 'y', 'o', 'g']
+        
 
     def __init__(self):
         self.index = 2
@@ -45,7 +47,14 @@ class CubeMap:
         self.ortho = []
         # Map of cube faces.
         self.map = [[['_' for col in range(3)]
-                for row in range(3)] for colors in range(6)]
+                     for row in range(3)] for colors in range(6)]
+        #   B
+        # W R Y O
+        #   G
+
+        #   0
+        # 1 2 3 4
+        #   5
 
     def print_subcube(self, index):
         if (index == 0 or index == 5):
@@ -89,7 +98,8 @@ class CubeMap:
         center_color = self.ortho[3*1 + 1][1]
 
         if (center_color[0] == self.Color.from_index[self.bk[self.index]]):
-            print(f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
+            print(
+                f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
             return False
         if (center_color[0] != self.Color.from_index[self.index]):
             print(
@@ -122,15 +132,16 @@ class CubeMap:
                 exit()
 
     def mapping_frequency_success(self):
-            if (self.total_readings < MIN_TOTAL_READING_BUFFER):
-                return False
-            for i in range(3):
-                for j in range(3):
-                    if (self.Color.max_freq[i][j]/self.total_readings < MIN_COLOR_CONFIDENCE_THRESHOLD):
-                        return False
-                    else:
-                        pass
-            return True
+        if (self.total_readings < MIN_TOTAL_READING_BUFFER):
+            return False
+        for i in range(3):
+            for j in range(3):
+                if (self.Color.max_freq[i][j]/self.total_readings < MIN_COLOR_CONFIDENCE_THRESHOLD or
+                        self.Color.max_freq[i][j] < MIN_COLOR_COUNT_THRESHOLD):
+                    return False
+                else:
+                    pass
+        return True
 
     def reset_mapping(self):
         self.total_readings = 0
@@ -145,17 +156,7 @@ class CubeMap:
 # cube_angles = (angle)
 cube_angles = []
 
-
 center_cube = (0, 0)
-
-
-#   B
-# W R Y O
-#   G
-
-#   0
-# 1 2 3 4
-#   5
 
 with open("config.json") as f:
     data = json.load(f)
@@ -317,6 +318,12 @@ def draw_cube_contour(frame, color, mask, is_rotated=False):
                 cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
 
 
+def draw_stickers():
+    for i in range(3):
+        for j in range(3):
+            pass
+
+
 cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
 cube_map = CubeMap()
@@ -378,10 +385,3 @@ while True:
 # End process
 cap.release()
 cv.destroyAllWindows()
-
-# https://docs.opencv.org/4.5.2/d5/d69/tutorial_py_non_local_means.html
-# https://docs.opencv.org/4.5.2/db/d27/tutorial_py_table_of_contents_feature2d.html
-
-# https://scikit-image.org/docs/stable/
-# https://www.pyimagesearch.com/2021/02/15/automatic-color-correction-with-opencv-and-python/
-# https://www.pyimagesearch.com/2014/08/04/opencv-python-color-detection/

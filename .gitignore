@@ -120,3 +120,4 @@ src/vid/**
 
 .vscode
 tempCodeRunnerFile.py
+workspace.code-workspace
