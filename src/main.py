@@ -7,8 +7,6 @@ import copy
 from math import pi
 from constants import *
 
-import time
-
 PAUSE_AT_END = False
 
 
@@ -217,6 +215,7 @@ class CubeMap:
                                CUBE_LENGTH, cy+CUBE_LENGTH)
         self.draw_stickers(frame, 5, cx+CUBE_LENGTH, cy+2*CUBE_LENGTH)
 
+
 class Camera:
     def __init__(self) -> None:
         self.cube_angles = []
@@ -224,15 +223,15 @@ class Camera:
         self.rotated_frame = None
         self.cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
-    def contour_bypass(self,w, h, contour_bypass_ratio) -> bool:
+    def contour_bypass(self, w, h, contour_bypass_ratio) -> bool:
         '''
         Checks if contour shape is square-like
         '''
         return (w > contour_bypass_ratio * h
                 or h > contour_bypass_ratio * w
                 or max(w, h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
-    
-    def create_rotated_frame(self,frame):
+
+    def create_rotated_frame(self, frame):
         '''
         Make detected cube orthogonal (rotates frame)
         '''
@@ -265,14 +264,15 @@ class Camera:
             self.rotated_frame = cv.warpAffine(
                 src=frame, M=r_matrix, dsize=(width, height))
             return True
-    def create_contour_preview(self,frame, window_name, mask):
+
+    def create_contour_preview(self, frame, window_name, mask):
         '''
         Create weak contour preview based on mask
         '''
         preview_frame = cv.bitwise_and(frame, frame, mask=mask)
         cv.imshow(window_name, preview_frame)
 
-    def draw_cube_contour(self,frame, color, mask, is_rotated=False):
+    def draw_cube_contour(self, frame, color, mask, is_rotated=False):
         '''
         Draw contours with rotated rectangles and circles.
 
@@ -332,7 +332,7 @@ class Camera:
                             w = int(w)
                             h = int(h)
                             cv.rectangle(frame, (x - w, y - h),
-                                        (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
+                                         (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
                     if is_rotated:
                         cube_map.ortho.append(((x, y), color))
                     else:
@@ -345,14 +345,15 @@ class Camera:
                     # Draw text color name
                     if (SHOW_CONTOUR_COLOR_TEXT):
                         cv.putText(frame, color, (x + 7, y + h // 2),
-                                cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                                   cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
 
                     # Contour approximation based on the Douglas - Peucker algorithm
                     # over simplification: turn a curve into a similar one with less points.
                     epsilon = 0.1 * cv.arcLength(c, True)
                     approx = cv.approxPolyDP(c, epsilon, True)
                     cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
-    def run_process(self):
+
+    def run_main_process(self):
         while True:
             ret, frame = self.cap.read()
 
@@ -375,7 +376,8 @@ class Camera:
             # Handle rotated recognition.
             if (self.create_rotated_frame(original_frame)):
                 # convert
-                hsv_rotated_frame = cv.cvtColor(self.rotated_frame, cv.COLOR_BGR2HSV)
+                hsv_rotated_frame = cv.cvtColor(
+                    self.rotated_frame, cv.COLOR_BGR2HSV)
 
                 # generate masks.
                 rotated_masks = dict((c, cv.inRange(
@@ -387,7 +389,8 @@ class Camera:
                     original_rotated_frame = copy.copy(self.rotated_frame)
 
                 for c in COLORS:
-                    self.draw_cube_contour(self.rotated_frame, c, rotated_masks[c], True)
+                    self.draw_cube_contour(
+                        self.rotated_frame, c, rotated_masks[c], True)
                     if (SHOW_CONTOUR_PREVIEW):
                         self.create_contour_preview(
                             self.rotated_frame, c, rotated_masks[c])
@@ -419,6 +422,7 @@ class Camera:
         self.cap.release()
         cv.destroyAllWindows()
 
+
 with open("config.json") as f:
     data = json.load(f)
 
@@ -446,4 +450,4 @@ cam = Camera()
 
 cube_map = CubeMap()
 
-cam.run_process()
+cam.run_main_process()
