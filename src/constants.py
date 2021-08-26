@@ -25,7 +25,7 @@ MIN_TOTAL_READING_BUFFER = 5
 # 30 for slower
 
 # Reset reading buffer count to 0 once limit is reached.
-MAX_TOTAL_READING_BUFFER = 20
+MAX_TOTAL_READING_BUFFER = 10
 # 60 for slower
 
 # If after MIN_COLOR_FREQUENCY number of readings, all
@@ -38,7 +38,8 @@ MIN_COLOR_COUNT_THRESHOLD = 5
 
 STICKER_LENGTH = 20
 STICKER_GAP = 3
-CUBE_GAP = 3
-# class Sticker:
-    # GAP = 1
-    # LENGTH = 10
+CUBE_LENGTH = 3*STICKER_LENGTH + 4 * STICKER_GAP+2
+CUBE_GAP = 10
+# CUBE_GAP = 3*STICKER_LENGTH + 3 * STICKER_GAP+2
+
+# PAUSE_AT_END = True

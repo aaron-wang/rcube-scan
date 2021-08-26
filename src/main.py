@@ -7,6 +7,10 @@ import copy
 from math import pi
 from constants import *
 
+import time
+
+PAUSE_AT_END = False
+
 
 class CubeMap:
     nxt = {
@@ -39,36 +43,41 @@ class CubeMap:
 
         from_index = ['b', 'w', 'r', 'y', 'o', 'g']
 
-        to_index = {'b':0, 'w':1, 'r':2, 'y':3, 'o':4, 'g':5}
+        to_index = {'b': 0, 'w': 1, 'r': 2, 'y': 3, 'o': 4, 'g': 5}
 
         to_bgr_color = {
-            'b': (255,0,0), 
-            'w': (255,255,255), 
-            'r': (0,0,255), 
-            'y': (0,255,255), 
-            'o': (0,165,255), 
-            'g': (0,255,0),
-            '_': (128,128,128)
-            }
-        
+            'b': (255, 0, 0),
+            'w': (255, 255, 255),
+            'r': (0, 0, 255),
+            'y': (0, 255, 255),
+            'o': (0, 165, 255),
+            'g': (0, 255, 0),
+            '_': (128, 128, 128)
+        }
 
     def __init__(self):
+        # which cube color
         self.index = 2
+        # count of frames read.
         self.total_readings = 0
-        # cubes: ((x,y),'color')
+        # ortho: ((x,y),'fullcolor_name')
         self.ortho = []
         # Map of cube faces.
         self.map = [[['_' for col in range(3)]
                      for row in range(3)] for colors in range(6)]
-        #   B
-        # W R Y O
-        #   G
-
-        #   0
-        # 1 2 3 4
-        #   5
 
     def print_subcube(self, index):
+        '''
+        Prints as follows.
+            B
+        W   R   Y   O
+            G
+
+            0
+        1   2   3   4
+            5
+        Empty parts of 3 x 4 grid are skipped.
+        '''
         if (index == 0 or index == 5):
             for row in range(3):
                 for col in range(2 * 3):
@@ -85,14 +94,20 @@ class CubeMap:
                 print()
 
     def print_text_cube_map(self):
+        '''
+        Print three rows
+        Top and bottom print once.
+        Middle prints 4 times.
+        '''
         self.print_subcube(0)
         self.print_subcube(1)
         self.print_subcube(5)
 
-    def process(self, frame):
+    def process(self):
         '''
         Determine which colors map where on the cube
         '''
+        global PAUSE_AT_END
         # sort by y value
         # then chunk in groups of 3:
         # sort by x value for each respective group
@@ -111,11 +126,11 @@ class CubeMap:
 
         if (center_color[0] == self.Color.from_index[self.bk[self.index]]):
             # print(
-                # f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
+            # f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
             return False
         if (center_color[0] != self.Color.from_index[self.index]):
             # print(
-                # f"WRONG STARTING COLOR: start on {self.Color.from_index[self.index]}")
+            # f"WRONG STARTING COLOR: start on {self.Color.from_index[self.index]}")
             return False
 
         for row in range(3):
@@ -136,15 +151,13 @@ class CubeMap:
                 for col in range(3):
                     self.map[self.index][row][col] = self.Color.name[row][col][0]
             self.print_text_cube_map()
-            # self.draw_stickers(frame,200,100)
 
             self.reset_mapping()
 
             self.index = self.nxt[self.index]
 
-
             if (self.index == -1):
-                exit()
+                PAUSE_AT_END = True
 
     def mapping_frequency_success(self):
         if (self.total_readings < MIN_TOTAL_READING_BUFFER):
@@ -167,22 +180,38 @@ class CubeMap:
         self.Color.max_freq = [[0 for i in range(3)] for j in range(3)]
         self.Color.name = [['X' for i in range(3)] for j in range(3)]
 
-    def draw_stickers(self,frame,index,x,y):
-        bottom_right = (x+STICKER_LENGTH * 3 + 3*STICKER_GAP+2,y+STICKER_LENGTH*3+ 3*STICKER_GAP+2)
-        cv.rectangle(frame,(x-STICKER_GAP,y-STICKER_GAP),bottom_right,(0,0,0),-1)
-        # print(bottom_right)
-
-        print(self.index)
-        # print(dx,dy)
+    def draw_stickers(self, frame, index, x, y):
+        bottom_right = (x+STICKER_LENGTH * 3 + 3*STICKER_GAP +
+                        2, y+STICKER_LENGTH*3 + 3*STICKER_GAP+2)
+        cv.rectangle(frame, (x-STICKER_GAP, y-STICKER_GAP),
+                     bottom_right, (0, 0, 0), -1)
         for i in range(3):
             for j in range(3):
-                cx = x + j * STICKER_LENGTH + j*STICKER_GAP+ j
-                cy = y + i * STICKER_LENGTH + i*STICKER_GAP+ i
+                cx = x + j * STICKER_LENGTH + j*STICKER_GAP + j
+                cy = y + i * STICKER_LENGTH + i*STICKER_GAP + i
                 color = self.Color.to_bgr_color[self.map[index][i][j]]
-                # print(color)
-                cv.rectangle(frame,(cx,cy),(cx+STICKER_LENGTH,cy+STICKER_LENGTH),
-                    color,-1)
-            # print()
+                cv.rectangle(frame, (cx, cy), (cx+STICKER_LENGTH, cy+STICKER_LENGTH),
+                             color, -1)
+
+    def draw_supercube(self, frame):
+        '''
+        Prints as follows.
+            B
+        W   R   Y   O
+            G
+
+            0
+        1   2   3   4
+            5
+        Empty parts of 3 x 4 grid are skipped.
+        '''
+        (cx, cy) = (50, 50)
+        self.draw_stickers(frame, 0, cx+CUBE_LENGTH, cy)
+        for i in range(4):
+            self.draw_stickers(frame, i+1, cx + i *
+                               CUBE_LENGTH, cy+CUBE_LENGTH)
+        self.draw_stickers(frame, 5, cx+CUBE_LENGTH, cy+2*CUBE_LENGTH)
+
 
 cube_angles = []
 
@@ -396,9 +425,16 @@ while True:
     else:
         pass
 
-    cube_map.process(frame)
-    cube_map.draw_stickers(frame,2,200,100)
+    cube_map.process()
+    cube_map.draw_supercube(frame)
+
     cv.imshow('frame', frame)
+    if (PAUSE_AT_END):
+        print("PAUSED")
+        while (1):
+            key = cv.waitKey(1)
+            if (key == ord('q')):
+                exit()
     # MAP THE CUBE.
 
     cube_angles.clear()
