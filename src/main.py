@@ -38,6 +38,18 @@ class CubeMap:
         name = [['X' for i in range(3)] for j in range(3)]
 
         from_index = ['b', 'w', 'r', 'y', 'o', 'g']
+
+        to_index = {'b':0, 'w':1, 'r':2, 'y':3, 'o':4, 'g':5}
+
+        to_bgr_color = {
+            'b': (255,0,0), 
+            'w': (255,255,255), 
+            'r': (0,0,255), 
+            'y': (0,255,255), 
+            'o': (0,165,255), 
+            'g': (0,255,0),
+            '_': (128,128,128)
+            }
         
 
     def __init__(self):
@@ -77,7 +89,7 @@ class CubeMap:
         self.print_subcube(1)
         self.print_subcube(5)
 
-    def process(self):
+    def process(self, frame):
         '''
         Determine which colors map where on the cube
         '''
@@ -98,12 +110,12 @@ class CubeMap:
         center_color = self.ortho[3*1 + 1][1]
 
         if (center_color[0] == self.Color.from_index[self.bk[self.index]]):
-            print(
-                f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
+            # print(
+                # f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
             return False
         if (center_color[0] != self.Color.from_index[self.index]):
-            print(
-                f"WRONG STARTING COLOR: start on {self.Color.from_index[self.index]}")
+            # print(
+                # f"WRONG STARTING COLOR: start on {self.Color.from_index[self.index]}")
             return False
 
         for row in range(3):
@@ -124,9 +136,12 @@ class CubeMap:
                 for col in range(3):
                     self.map[self.index][row][col] = self.Color.name[row][col][0]
             self.print_text_cube_map()
+            # self.draw_stickers(frame,200,100)
+
             self.reset_mapping()
 
             self.index = self.nxt[self.index]
+
 
             if (self.index == -1):
                 exit()
@@ -152,8 +167,23 @@ class CubeMap:
         self.Color.max_freq = [[0 for i in range(3)] for j in range(3)]
         self.Color.name = [['X' for i in range(3)] for j in range(3)]
 
+    def draw_stickers(self,frame,index,x,y):
+        bottom_right = (x+STICKER_LENGTH * 3 + 3*STICKER_GAP+2,y+STICKER_LENGTH*3+ 3*STICKER_GAP+2)
+        cv.rectangle(frame,(x-STICKER_GAP,y-STICKER_GAP),bottom_right,(0,0,0),-1)
+        # print(bottom_right)
 
-# cube_angles = (angle)
+        print(self.index)
+        # print(dx,dy)
+        for i in range(3):
+            for j in range(3):
+                cx = x + j * STICKER_LENGTH + j*STICKER_GAP+ j
+                cy = y + i * STICKER_LENGTH + i*STICKER_GAP+ i
+                color = self.Color.to_bgr_color[self.map[index][i][j]]
+                # print(color)
+                cv.rectangle(frame,(cx,cy),(cx+STICKER_LENGTH,cy+STICKER_LENGTH),
+                    color,-1)
+            # print()
+
 cube_angles = []
 
 center_cube = (0, 0)
@@ -318,12 +348,6 @@ def draw_cube_contour(frame, color, mask, is_rotated=False):
                 cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
 
 
-def draw_stickers():
-    for i in range(3):
-        for j in range(3):
-            pass
-
-
 cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
 cube_map = CubeMap()
@@ -372,9 +396,10 @@ while True:
     else:
         pass
 
+    cube_map.process(frame)
+    cube_map.draw_stickers(frame,2,200,100)
     cv.imshow('frame', frame)
     # MAP THE CUBE.
-    cube_map.process()
 
     cube_angles.clear()
     cube_map.ortho.clear()

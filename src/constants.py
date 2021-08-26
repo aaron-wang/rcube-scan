@@ -36,3 +36,9 @@ MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
 # MIN_TOTAL_READING_BUFFER shortcircuits this, taking higher precedence.
 MIN_COLOR_COUNT_THRESHOLD = 5
 
+STICKER_LENGTH = 20
+STICKER_GAP = 3
+CUBE_GAP = 3
+# class Sticker:
+    # GAP = 1
+    # LENGTH = 10
