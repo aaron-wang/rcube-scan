@@ -18,10 +18,9 @@ ANGLE_EPSILON = 1.0
 
 # CUBE MAPPING
 # -----------
-# How many frame readings required before considering to
-# lock color mapping for this cube side/face.
-
-# Lower MIN..BUFFER --> faster cube mapping but higher chance of error
+# How many frame readings required before considering
+# to lock color mapping for this side/face.
+# Lower MIN_TOTAL_READING_BUFFER => faster cube mapping, but higher chance of error
 # Also change MIN_COLOR_COUNT_THRESHOLD accordingly
 MIN_TOTAL_READING_BUFFER = 5
 
@@ -33,7 +32,7 @@ MAX_TOTAL_READING_BUFFER = 10
 MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
 
 # For each cube piece, one color should be read at least this many times.
-# MIN_TOTAL_READING_BUFFER shortcircuits this, taking higher precedence.
+# MIN_TOTAL_READING_BUFFER always takes higher precedence.
 MIN_COLOR_COUNT_THRESHOLD = 5
 
 # length of a sticker (square)
@@ -45,6 +44,3 @@ STICKER_SUPER_LENGTH = STICKER_LENGTH + STICKER_GAP
 
 CUBE_LENGTH = 3*STICKER_LENGTH + 4 * STICKER_GAP+2
 CUBE_GAP = 10
-# CUBE_GAP = 3*STICKER_LENGTH + 3 * STICKER_GAP+2
-
-# PAUSE_AT_END = True

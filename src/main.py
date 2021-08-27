@@ -44,12 +44,22 @@ class CubeMap:
         to_index = {'b': 0, 'w': 1, 'r': 2, 'y': 3, 'o': 4, 'g': 5}
 
         to_bgr_color = {
-            'b': (255, 0, 0),
+            'b': (217,56,56),
             'w': (255, 255, 255),
             'r': (0, 0, 255),
             'y': (0, 255, 255),
-            'o': (0, 165, 255),
-            'g': (0, 255, 0),
+            'o': (0, 128, 255),
+            # 'g': (50, 191, 50),
+            'g': (74,200,32),
+            '_': (128, 128, 128)
+        }
+        to_bgr_light_color = {
+            'b': (255, 128, 128),
+            'w': (200, 200, 200),
+            'r': (128, 128, 255),
+            'y': (180, 255, 255),
+            'o': (130, 211, 255),
+            'g': (128, 255, 128),
             '_': (128, 128, 128)
         }
 
@@ -142,9 +152,11 @@ class CubeMap:
                 if (current_color_freq > self.Color.max_freq[row][col]):
                     self.Color.max_freq[row][col] = current_color_freq
                     self.Color.name[row][col] = current_color
+                self.map[self.index][row][col] = self.Color.name[row][col][0]
 
         self.total_readings += 1
         print(self.total_readings)
+        
         if(self.mapping_frequency_success()):
             for row in range(3):
                 for col in range(3):
@@ -152,13 +164,20 @@ class CubeMap:
             self.print_text_cube_map()
 
             self.reset_mapping()
-
             self.index = self.nxt[self.index]
 
             if (self.index == -1):
                 PAUSE_AT_END = True
+            self.map[self.index][1][1] = self.Color.from_index[self.index]
+        # else:
+        #     for row in range(3):
+        #         for col in range(3):
+        #             self.map[self.index][row][col] = self.Color.name[row][col][0]
 
     def mapping_frequency_success(self):
+        '''
+        Check if readings match frequency requirements
+        '''
         if (self.total_readings < MIN_TOTAL_READING_BUFFER):
             return False
         for i in range(3):
@@ -179,7 +198,7 @@ class CubeMap:
         self.Color.max_freq = [[0 for i in range(3)] for j in range(3)]
         self.Color.name = [['X' for i in range(3)] for j in range(3)]
 
-    def draw_stickers(self, frame, index, x, y):
+    def draw_stickers(self, frame, index, x, y,preview=False):
         bottom_right = (x + 3 * (STICKER_SUPER_LENGTH) + 2,
                         y + 3 * (STICKER_SUPER_LENGTH) + 2)
 
@@ -190,11 +209,17 @@ class CubeMap:
             for j in range(3):
                 cx = x + j * (STICKER_SUPER_LENGTH) + j
                 cy = y + i * (STICKER_SUPER_LENGTH) + i
-                color = self.Color.to_bgr_color[self.map[index][i][j]]
+                if (not preview):
+                    color = self.Color.to_bgr_color[self.map[index][i][j]]
+                else:
+                    if (index == self.index):
+                        color = self.Color.to_bgr_light_color[self.map[index][i][j]]
+                    else:
+                        color = self.Color.to_bgr_color[self.map[index][i][j]]
                 cv.rectangle(frame, (cx, cy), (cx+STICKER_LENGTH, cy+STICKER_LENGTH),
                              color, -1)
 
-    def draw_supercube(self, frame):
+    def draw_supercube(self, frame, preview=False):
         '''
         Draws as follows.
         - Top and bottom drawn once.
@@ -209,11 +234,11 @@ class CubeMap:
         Empty parts of 3 x 4 grid are skipped.
         '''
         (cx, cy) = (50, 50)
-        self.draw_stickers(frame, 0, cx+CUBE_LENGTH, cy)
+        self.draw_stickers(frame, 0, cx+CUBE_LENGTH, cy,preview)
         for i in range(4):
             self.draw_stickers(frame, i+1, cx + i *
-                               CUBE_LENGTH, cy+CUBE_LENGTH)
-        self.draw_stickers(frame, 5, cx+CUBE_LENGTH, cy+2*CUBE_LENGTH)
+                               CUBE_LENGTH, cy+CUBE_LENGTH,preview)
+        self.draw_stickers(frame, 5, cx+CUBE_LENGTH, cy+2*CUBE_LENGTH,preview)
 
 
 class Camera:
@@ -222,6 +247,7 @@ class Camera:
         self.center_cube = (0, 0)
         self.rotated_frame = None
         self.cap = cv.VideoCapture(0, cv.CAP_DSHOW)
+        self.cube_map = CubeMap()
 
     def contour_bypass(self, w, h, contour_bypass_ratio) -> bool:
         '''
@@ -260,7 +286,7 @@ class Camera:
                 rotate_angle -= 90
             height, width = frame.shape[:2]
             r_matrix = cv.getRotationMatrix2D(
-                center=center_cube, angle=rotate_angle, scale=1)
+                center=self.center_cube, angle=rotate_angle, scale=1)
             self.rotated_frame = cv.warpAffine(
                 src=frame, M=r_matrix, dsize=(width, height))
             return True
@@ -334,13 +360,12 @@ class Camera:
                             cv.rectangle(frame, (x - w, y - h),
                                          (x + 2 * w, y + 2 * h), (255, 0, 0), 2)
                     if is_rotated:
-                        cube_map.ortho.append(((x, y), color))
+                        self.cube_map.ortho.append(((x, y), color))
                     else:
                         if (not is_circle_center):
                             self.cube_angles.append(angle)
                         else:
-                            global center_cube
-                            center_cube = center
+                            self.center_cube = center
 
                     # Draw text color name
                     if (SHOW_CONTOUR_COLOR_TEXT):
@@ -400,8 +425,8 @@ class Camera:
             else:
                 pass
 
-            cube_map.process()
-            cube_map.draw_supercube(frame)
+            self.cube_map.process()
+            self.cube_map.draw_supercube(frame,True)
 
             cv.imshow('frame', frame)
 
@@ -413,7 +438,7 @@ class Camera:
                         exit()
 
             self.cube_angles.clear()
-            cube_map.ortho.clear()
+            self.cube_map.ortho.clear()
 
             key = cv.waitKey(1)
             if (key == ord('q')):
@@ -447,7 +472,5 @@ for c in COLORS:
     CubeMap.Color.freq[c] = [[0 for i in range(3)] for j in range(3)]
 
 cam = Camera()
-
-cube_map = CubeMap()
 
 cam.run_main_process()
