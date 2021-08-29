@@ -1,9 +1,11 @@
 SHOW_CONTOUR_COLOR_TEXT = True
 SHOW_ENTIRE_BOUNDING_RECTANGLE = False
 
-SHOW_CONTOUR_PREVIEW = True
+SHOW_CONTOUR_PREVIEW = 1
 SHOW_RAW_CONTOUR_PREVIEW = False
 SHOW_ROTATED_FRAME_PREVIEW = True
+
+SHOW_DEBUG_CONSOLE_TXT = True
 
 # CONTOURS
 # --------
@@ -25,17 +27,17 @@ ANGLE_EPSILON = 1.0
 # to lock color mapping for this side/face.
 # Lower MIN_TOTAL_READING_BUFFER => faster cube mapping, but higher chance of error
 # Also change MIN_COLOR_COUNT_THRESHOLD accordingly
-MIN_TOTAL_READING_BUFFER = 10
+MIN_TOTAL_READING_BUFFER = 5
 
 # Reset reading buffer count to 0 once limit is reached.
-MAX_TOTAL_READING_BUFFER = 20
+MAX_TOTAL_READING_BUFFER = 10
 
 # If after MIN_COLOR_FREQUENCY number of readings, all
 # colors have at least this percentage of confidence.
 MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
 
 # For each cube piece, one color should be read at least this many times.
-MIN_COLOR_COUNT_THRESHOLD = 10
+MIN_COLOR_COUNT_THRESHOLD = 5
 
 # length of a sticker (square)
 STICKER_LENGTH = 20

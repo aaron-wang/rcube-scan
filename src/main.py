@@ -3,6 +3,7 @@ import cv2 as cv
 
 import json
 import copy
+import kociemba
 
 from math import pi
 from constants import *
@@ -41,7 +42,7 @@ class CubeMap:
 
         from_index = ['b', 'w', 'r', 'y', 'o', 'g']
 
-        to_index = {'b': 0, 'w': 1, 'r': 2, 'y': 3, 'o': 4, 'g': 5}
+        to_index = {'b': 0, 'w': 1, 'r': 2, 'y': 3, 'o': 4, 'g': 5,'_':99}
 
         to_bgr_color = {
             'b': (217,56,56),
@@ -73,6 +74,17 @@ class CubeMap:
         # Map of cube faces.
         self.map = [[['_' for col in range(3)]
                      for row in range(3)] for colors in range(6)]
+        # U R F D L B
+        # 0 3 2 5 1 4
+        self.flat_map = {
+            0: 'U',
+            3: 'R',
+            2: 'F',
+            5: 'D',
+            1: 'L',
+            4: 'B',
+            99: 'X'
+        }
 
     def print_subcube(self, index):
         '''
@@ -114,7 +126,8 @@ class CubeMap:
 
     def process(self):
         '''
-        Determine which colors map where on the cube
+        Determine which colors map where on the cube.
+        Called on every frame capture read.
         '''
         global PAUSE_AT_END
         # sort by y value
@@ -155,13 +168,15 @@ class CubeMap:
                 self.map[self.index][row][col] = self.Color.name[row][col][0]
 
         self.total_readings += 1
-        print(self.total_readings)
+        if (SHOW_DEBUG_CONSOLE_TXT):
+            print(self.total_readings)
         
         if(self.mapping_frequency_success()):
             for row in range(3):
                 for col in range(3):
                     self.map[self.index][row][col] = self.Color.name[row][col][0]
-            self.print_text_cube_map()
+            if (SHOW_DEBUG_CONSOLE_TXT):
+                self.print_text_cube_map()
 
             self.reset_mapping()
             self.index = self.nxt[self.index]
@@ -236,7 +251,32 @@ class CubeMap:
                                CUBE_LENGTH, cy+CUBE_LENGTH,preview)
         self.draw_stickers(frame, 5, cx+CUBE_LENGTH, cy+2*CUBE_LENGTH,preview)
 
+    def color_to_notation(self, color):
+        '''
+        Convert the color string into its index.
+        Convert the index into standard notation.
+        '''
+        return self.flat_map[self.Color.to_index[color]]
 
+    def flatten_cube(self):
+        '''
+        Flatten the cube map into a single string.
+
+        Go through each face and convert colors to standard notation.
+        '''
+        ret = ""
+        for face in self.flat_map.keys():
+            if (face == 99):
+                continue
+            for i in range(3):
+                for j in range(3):
+                    ret += self.color_to_notation(self.map[face][i][j])
+        # ret = ''.join([self.color_to_notation(self.map[face][i][j]) if face != 99 else '' for j in range(3)
+        # for i in range(3) for face in self.flat_map.keys()])
+        # print(ret)
+        return ret
+
+        
 class Camera:
     def __init__(self) -> None:
         self.cube_angles = []
@@ -428,9 +468,15 @@ class Camera:
             self.cube_map.draw_supercube(frame,True)
 
             cv.imshow('frame', frame)
+            # self.cube_map.flatten_cube()
             # allow cam to keep reading, but not process any further.
+            self.cube_map.flatten_cube()
             global PAUSE_AT_END
             if (PAUSE_AT_END):
+                try:
+                    print(kociemba.solve(self.cube_map.flatten_cube()))
+                except ValueError:
+                    print("RETRY")
                 print("PAUSED")
                 while (1):
                     ret, frame = self.cap.read()
