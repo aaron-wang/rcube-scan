@@ -169,10 +169,6 @@ class CubeMap:
             if (self.index == -1):
                 PAUSE_AT_END = True
             self.map[self.index][1][1] = self.Color.from_index[self.index]
-        # else:
-        #     for row in range(3):
-        #         for col in range(3):
-        #             self.map[self.index][row][col] = self.Color.name[row][col][0]
 
     def mapping_frequency_success(self):
         '''
@@ -417,11 +413,14 @@ class Camera:
                     self.draw_cube_contour(
                         self.rotated_frame, c, rotated_masks[c], True)
                     if (SHOW_CONTOUR_PREVIEW):
-                        self.create_contour_preview(
-                            self.rotated_frame, c, rotated_masks[c])
-                        # create_contour_preview(
-                        # original_rotated_frame, c, rotated_masks[c])
-                cv.imshow('Rotated image', self.rotated_frame)
+                        if (SHOW_RAW_CONTOUR_PREVIEW):
+                            self.create_contour_preview(
+                                original_rotated_frame, c, rotated_masks[c])
+                        else:
+                            self.create_contour_preview(
+                                self.rotated_frame, c, rotated_masks[c])
+                if (SHOW_ROTATED_FRAME_PREVIEW):
+                    cv.imshow('Rotated image', self.rotated_frame)
             else:
                 pass
 
@@ -429,13 +428,25 @@ class Camera:
             self.cube_map.draw_supercube(frame,True)
 
             cv.imshow('frame', frame)
-
+            # allow cam to keep reading, but not process any further.
+            global PAUSE_AT_END
             if (PAUSE_AT_END):
                 print("PAUSED")
                 while (1):
+                    ret, frame = self.cap.read()
+
+                    self.cube_map.draw_supercube(frame,True)
+
+                    cv.imshow('frame', frame)
                     key = cv.waitKey(1)
                     if (key == ord('q')):
+                        self.cap.release()
+                        cv.destroyAllWindows()
+                        PAUSE_AT_END = False
+                        return
+                    if (key == ord('x')):
                         exit()
+                        # exit()
 
             self.cube_angles.clear()
             self.cube_map.ortho.clear()
@@ -443,6 +454,12 @@ class Camera:
             key = cv.waitKey(1)
             if (key == ord('q')):
                 break
+            if (key == ord('x')):
+                exit()
+            if (key == ord('r')):
+                self.cube_map.index = self.cube_map.bk[self.cube_map.index]
+                if (self.cube_map.index == -1):
+                    self.cube_map.index = 2
         # End process
         self.cap.release()
         cv.destroyAllWindows()
@@ -471,6 +488,11 @@ rotated_masks = list()
 for c in COLORS:
     CubeMap.Color.freq[c] = [[0 for i in range(3)] for j in range(3)]
 
+# while True:
 cam = Camera()
 
 cam.run_main_process()
+# cam.__init__()
+# cam = Camera()
+
+# cam.run_main_process()
