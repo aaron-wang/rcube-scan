@@ -62,8 +62,8 @@
         "white": {
             "lower_bound": [
                 25,
-                10,
-                180
+                2,
+                100
             ],
             "upper_bound": [
                 105,

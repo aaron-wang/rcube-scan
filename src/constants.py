@@ -1,11 +1,18 @@
+MAIN_FRAME_NAME = "Rubik's Cube Reader"
 SHOW_CONTOUR_COLOR_TEXT = True
 SHOW_ENTIRE_BOUNDING_RECTANGLE = False
 
-SHOW_CONTOUR_PREVIEW = 1
+# introduces latency - but preview the contours
+SHOW_MASK_PREVIEW = 0
+# if both are true, rotated contours takes precedent.
+SHOW_ROTATED_MASK_PREVIEW = 0
+# show the contour lines on the masks.
 SHOW_RAW_CONTOUR_PREVIEW = False
-SHOW_ROTATED_FRAME_PREVIEW = True
+SHOW_ROTATED_FRAME_PREVIEW = 0
 
-SHOW_DEBUG_CONSOLE_TXT = True
+SHOW_DEBUG_CONSOLE_TXT = 0
+
+LOW_RES_CAMERA = 0
 
 # CONTOURS
 # --------
@@ -27,17 +34,17 @@ ANGLE_EPSILON = 1.0
 # to lock color mapping for this side/face.
 # Lower MIN_TOTAL_READING_BUFFER => faster cube mapping, but higher chance of error
 # Also change MIN_COLOR_COUNT_THRESHOLD accordingly
-MIN_TOTAL_READING_BUFFER = 5
+MIN_TOTAL_READING_BUFFER = 3
 
 # Reset reading buffer count to 0 once limit is reached.
-MAX_TOTAL_READING_BUFFER = 10
+MAX_TOTAL_READING_BUFFER = 7
 
 # If after MIN_COLOR_FREQUENCY number of readings, all
 # colors have at least this percentage of confidence.
 MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
 
 # For each cube piece, one color should be read at least this many times.
-MIN_COLOR_COUNT_THRESHOLD = 5
+MIN_COLOR_COUNT_THRESHOLD = 3
 
 # length of a sticker (square)
 STICKER_LENGTH = 20

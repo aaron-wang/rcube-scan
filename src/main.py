@@ -8,8 +8,9 @@ import kociemba
 from math import pi
 from constants import *
 
-PAUSE_AT_END = False
+import time
 
+PAUSE_AT_END = False
 
 class CubeMap:
     nxt = {
@@ -230,7 +231,7 @@ class CubeMap:
                 cv.rectangle(frame, (cx, cy), (cx+STICKER_LENGTH, cy+STICKER_LENGTH),
                              color, -1)
 
-    def draw_supercube(self, frame, preview=False):
+    def draw_supercube(self, frame, pos, preview=False):
         '''
         Draws as follows.
         - Top and bottom drawn once.
@@ -244,7 +245,11 @@ class CubeMap:
             5
         Empty parts of 3 x 4 grid are skipped.
         '''
-        (cx, cy) = (50, 50)
+        # (cx, cy) = (50, 50)
+        if (LOW_RES_CAMERA):
+            (cx, cy) = (330, 50)
+        else:
+            (cx,cy) = pos
         self.draw_stickers(frame, 0, cx+CUBE_LENGTH, cy,preview)
         for i in range(4):
             self.draw_stickers(frame, i+1, cx + i *
@@ -276,13 +281,62 @@ class CubeMap:
         # print(ret)
         return ret
 
-        
+    def reverse_notation(self,org_notation):
+        raw_notations_reversed = list(reversed(org_notation.split(' ')))    
+        inverse_notation_list = list()
+        for move in raw_notations_reversed:
+            if (len(move) == 1):
+                inverse_notation_list.append(move + "'")
+            elif (len(move) == 2):
+                if (move[1] == "2"):
+                    inverse_notation_list.append(move)
+                else:
+                    inverse_notation_list.append(move[0])
+            else:
+                raise(Exception)
+        return ' '.join(inverse_notation_list)      
+
+    def special_draw_text(self,frame, text,cx,thickness,scale,length_buffer):
+        '''
+        Put text of solution. Auto break line if exceeding box length.
+        Slightly tab second line.
+
+        Splits solution string into list, and processes each move unit.
+        '''
+        tmp = text.split(' ')
+        raw_partition = ""
+        current_length = 0
+        y = cx[1]
+        for x in tmp:
+            if (current_length >= length_buffer):
+                cv.putText(frame, raw_partition , (cx[0] + (13 if y != cx[1]else 0),y),
+                    cv.FONT_HERSHEY_SIMPLEX, thickness, (0,0,0), scale)
+                raw_partition = ""
+                current_length = 0
+                y += int(40 * thickness)
+            raw_partition +=  " " + x
+            current_length+= len(x) + 1
+        if (current_length != 0):
+            cv.putText(frame, raw_partition , (cx[0] + (13 if y != cx[1]else 0),y),
+                cv.FONT_HERSHEY_SIMPLEX, thickness, (0,0,0), scale)
+            raw_partition = ""
+
 class Camera:
     def __init__(self) -> None:
         self.cube_angles = []
         self.center_cube = (0, 0)
         self.rotated_frame = None
         self.cap = cv.VideoCapture(0, cv.CAP_DSHOW)
+
+        # self.cap = cv.VideoCapture(1, cv.CAP_DSHOW)
+        # print(self.cap.get(3))
+        # print(self.cap.get(4))
+        # if (not LOW_RES_CAMERA):
+        # self.cap. set(cv.CAP_PROP_FRAME_WIDTH, 800)
+        # self.cap. set(cv.CAP_PROP_FRAME_HEIGHT, 600)
+        # print(self.cap.get(3))
+        # print(self.cap.get(4))
+        # self.cap.set(cv.CAP_PROP_BUFFERSIZE, 1);
         self.cube_map = CubeMap()
 
     def contour_bypass(self, w, h, contour_bypass_ratio) -> bool:
@@ -384,9 +438,10 @@ class Camera:
                     is_circle_center = (
                         circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE * rot_area)
                     if (not is_circle_center or is_rotated):
-                        cv.drawContours(frame, [box], 0, (0, 255, 0), 2)
+                        # cv.drawContours(frame, [box], 0, (0, 255, 0), 2)
+                        pass
                     else:
-                        cv.circle(frame, center, radius, (0, 0, 255), 2)
+                        # cv.circle(frame, center, radius, (0, 0, 255), 2)
                         # optionally draw rough bounding rectangle for entire cube.
                         if (SHOW_ENTIRE_BOUNDING_RECTANGLE):
                             w *= 1.3
@@ -412,12 +467,14 @@ class Camera:
                     # over simplification: turn a curve into a similar one with less points.
                     epsilon = 0.1 * cv.arcLength(c, True)
                     approx = cv.approxPolyDP(c, epsilon, True)
-                    cv.drawContours(frame, approx, -1, (0, 255, 0), 3)
+                    cv.drawContours(frame, approx, -1, (0, 255, 0), 5)
 
     def run_main_process(self):
         while True:
+            start = time.time()
             ret, frame = self.cap.read()
-
+            if (not LOW_RES_CAMERA):
+                frame = cv.resize(frame,(800,600))
             original_frame = copy.copy(frame)
 
             # Main color recognition
@@ -428,11 +485,14 @@ class Camera:
             masks = dict(
                 (c, cv.inRange(hsv_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
             masks['red'] |= cv.inRange(hsv_frame, *HSV_RED_UNION_BOUND)
-
+            # Draw contours
             for c in COLORS:
                 self.draw_cube_contour(frame, c, masks[c])
-                if SHOW_CONTOUR_PREVIEW:
-                    self.create_contour_preview(original_frame, c, masks[c])
+                if SHOW_MASK_PREVIEW and not SHOW_ROTATED_MASK_PREVIEW:
+                    if (SHOW_RAW_CONTOUR_PREVIEW):
+                        self.create_contour_preview(frame, c, masks[c])
+                    else:
+                        self.create_contour_preview(original_frame, c, masks[c])
 
             # Handle rotated recognition.
             if (self.create_rotated_frame(original_frame)):
@@ -446,13 +506,13 @@ class Camera:
                 rotated_masks['red'] |= cv.inRange(
                     hsv_rotated_frame, *HSV_RED_UNION_BOUND)
 
-                if (SHOW_CONTOUR_PREVIEW):
+                if SHOW_ROTATED_MASK_PREVIEW:
                     original_rotated_frame = copy.copy(self.rotated_frame)
 
                 for c in COLORS:
                     self.draw_cube_contour(
                         self.rotated_frame, c, rotated_masks[c], True)
-                    if (SHOW_CONTOUR_PREVIEW):
+                    if SHOW_ROTATED_MASK_PREVIEW:
                         if (SHOW_RAW_CONTOUR_PREVIEW):
                             self.create_contour_preview(
                                 original_rotated_frame, c, rotated_masks[c])
@@ -465,25 +525,51 @@ class Camera:
                 pass
 
             self.cube_map.process()
-            self.cube_map.draw_supercube(frame,True)
+            # self.cube_map.draw_supercube(frame,(600,50),True)
+            # self.cube_map.draw_supercube(frame,(500,50),True)
+            self.cube_map.draw_supercube(frame,(10,50),True)
 
-            cv.imshow('frame', frame)
-            # self.cube_map.flatten_cube()
+            cv.imshow(MAIN_FRAME_NAME, frame)
             # allow cam to keep reading, but not process any further.
-            self.cube_map.flatten_cube()
             global PAUSE_AT_END
             if (PAUSE_AT_END):
                 try:
-                    print(kociemba.solve(self.cube_map.flatten_cube()))
+                    cv.destroyWindow("Rotated image")
+                except:
+                    pass
+                solve_moves = ""
+                rev_solve_moves = ""
+                try:
+                    solve_moves = (kociemba.solve(self.cube_map.flatten_cube()))
+                    # print(solve_moves)
+                    rev_solve_moves = self.cube_map.reverse_notation(solve_moves)
                 except ValueError:
                     print("RETRY")
+                    solve_moves = "INVALID READ SEQUENCE: Please retry."
                 print("PAUSED")
                 while (1):
                     ret, frame = self.cap.read()
 
-                    self.cube_map.draw_supercube(frame,True)
+                    if (not LOW_RES_CAMERA):
+                        frame = cv.resize(frame,(800,600))
 
-                    cv.imshow('frame', frame)
+                    # self.cube_map.draw_supercube(frame,(500,50),True)
+                    self.cube_map.draw_supercube(frame,(10,50),True)
+                    # cv.putText(frame, solve_moves , (20,400),
+                    #                cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+                    # cv.putText(frame, rev_solve_moves , (20,440),
+                    #                cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+                    # solve_moves = "U L2 F L F R F L2 U' B D' R' D R2 D' B2 R2 D2 B2 R2 D2 R2 R2 R2 R2 R2 U2 R2 R2 U2"
+                    # rev_solve_moves = solve_moves
+                    if (LOW_RES_CAMERA):
+                        cv.rectangle(frame,(10,380),(630,470),(254,217,255),-1)
+                        self.cube_map.special_draw_text(frame,solve_moves,(12,405),0.7,2,48)
+                        self.cube_map.special_draw_text(frame,rev_solve_moves,(12,460),0.35,1,100)
+                    else:
+                        cv.rectangle(frame,(10,500),(790,590),(254,217,255),-1)
+                        self.cube_map.special_draw_text(frame,solve_moves,(12,525),0.7,2,60)
+                        self.cube_map.special_draw_text(frame,rev_solve_moves,(12,575),0.35,1,120)
+                    cv.imshow(MAIN_FRAME_NAME, frame)
                     key = cv.waitKey(1)
                     if (key == ord('q')):
                         self.cap.release()
@@ -496,6 +582,8 @@ class Camera:
 
             self.cube_angles.clear()
             self.cube_map.ortho.clear()
+            end = time.time()
+            print(f"{(end-start) * 1000:.1f}")
 
             key = cv.waitKey(1)
             if (key == ord('q')):
@@ -509,6 +597,7 @@ class Camera:
         # End process
         self.cap.release()
         cv.destroyAllWindows()
+
 
 
 with open("config.json") as f:
@@ -534,10 +623,10 @@ rotated_masks = list()
 for c in COLORS:
     CubeMap.Color.freq[c] = [[0 for i in range(3)] for j in range(3)]
 
-# while True:
-cam = Camera()
+while True:
+    cam = Camera()
 
-cam.run_main_process()
+    cam.run_main_process()
 # cam.__init__()
 # cam = Camera()
 
