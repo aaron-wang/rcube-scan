@@ -5,7 +5,7 @@ import json
 import copy
 import kociemba
 
-from math import pi
+from math import pi, dist
 from constants import *
 
 import time
@@ -72,6 +72,8 @@ class CubeMap:
         self.total_readings = 0
         # ortho: ((x,y),'fullcolor_name')
         self.ortho = []
+        # raw_points: (x,y)
+        self.raw_points = []
         # Map of cube faces.
         self.map = [[['_' for col in range(3)]
                      for row in range(3)] for colors in range(6)]
@@ -202,6 +204,9 @@ class CubeMap:
         return True
 
     def reset_mapping(self):
+        '''
+        Initialize mapping as empty.
+        '''
         self.total_readings = 0
 
         for c in COLORS:
@@ -346,26 +351,101 @@ class Camera:
         return (w > contour_bypass_ratio * h
                 or h > contour_bypass_ratio * w
                 or max(w, h) > MAX_CONTOUR_SQUARE_EDGE_THRESHOLD)
+    
+    def find_center_cube(self, frame):
+        '''
+        Return the coordinates of the center cube. (If not circle center).
+
+        Method:
+        - Take the average of all points (X)
+        - Find the point (A) which is closest to such average (X)
+        - "Close" has a strict error bound. The average (X) should be near exact to the point (A)
+
+
+        Return false if invalid.
+        '''
+        avg_point_x = sum(x for x, _ in self.cube_map.raw_points) / 9
+        avg_point_y = sum(y for _, y in self.cube_map.raw_points) /9
+        avg_point = (avg_point_x, avg_point_y)
+
+        # print(avg_point)
+
+        (best_point, best_delta) = (self.cube_map.raw_points[0], dist(avg_point,self.cube_map.raw_points[0]))
+        (far_point, far_delta) = (best_point, best_delta)
+
+        for pt in self.cube_map.raw_points:
+            curr_dist = dist(avg_point,pt)
+            # print(curr_dist)
+            if (curr_dist < best_delta):
+                best_delta = curr_dist
+                best_point = pt
+            if (curr_dist > far_delta):
+                far_delta = curr_dist
+                far_point = pt
+
+        # cv.circle(frame,center=best_point,radius=5,color=(0,0,200))
+        # cv.imshow("frame2",frame)
+
+        if (SHOW_DEBUG_CONSOLE_TXT):
+            # print("BEST DELTA:\t",best_delta)
+            # print("FAR DELTA:\t",far_delta)
+            # print("TOLERANCE:\t", far_delta * 1.0/3.0 * CENTER_EPSILON)
+            print()
+        if (best_delta < far_delta * 1.0/3.0 * CENTER_EPSILON):
+            return best_point
+        else:
+            return False
+
+        # if (best_delta - avg_point)
+        
+
+
+            
 
     def create_rotated_frame(self, frame):
         '''
-        Make detected cube orthogonal (rotates frame)
+        Make detected cube orthogonal (rotates frame). Returns true if successful.
         '''
         rotate_angle = 0
         self.cube_angles.sort
         mean_angle = sum(self.cube_angles)
         median_angle = 0
-        # get median and average.
-        if (len(self.cube_angles) == 8):
-            mean_angle /= len(self.cube_angles)
-            median_angle = self.cube_angles[len(self.cube_angles) // 2]
-            if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
-                # The average angle is more accurate than the median
-                rotate_angle = mean_angle
+
+        
+        if (HAS_CIRCLE_CENTER):
+            # get median and average.
+            if (len(self.cube_angles) == 8):
+                mean_angle /= len(self.cube_angles)
+                median_angle = self.cube_angles[len(self.cube_angles) // 2]
+                if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
+                    # The average angle is more accurate than the median
+                    rotate_angle = mean_angle
+                else:
+                    rotate_angle = median_angle
             else:
-                rotate_angle = median_angle
+                return False
         else:
-            return False
+            # print("ROTATED CASE")
+            #Proceed exactly as in above.
+            if (len(self.cube_angles) == 9):
+                mean_angle /= len(self.cube_angles)
+                median_angle = self.cube_angles[len(self.cube_angles) // 2]
+                if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
+                    # The average angle is more accurate than the median
+                    rotate_angle = mean_angle
+                else:
+                    rotate_angle = median_angle
+                # Find the center first.
+                flag = self.find_center_cube(frame)
+
+                if (type(flag) is bool):
+                    # print("type flag is bool")
+                    return False
+                else:
+                    self.center_cube = flag
+            else:
+                # print("EARLY EXIT 1")
+                return False
         # Prevent inaccuracies when cube angle is uncertain
         # (two orientations with near likely probability)
         if (abs(rotate_angle - 45) < ANGLE_EPSILON):
@@ -441,7 +521,8 @@ class Camera:
                         # cv.drawContours(frame, [box], 0, (0, 255, 0), 2)
                         pass
                     else:
-                        # cv.circle(frame, center, radius, (0, 0, 255), 2)
+                        if (HAS_CIRCLE_CENTER):
+                            cv.circle(frame, center, radius, (0, 0, 255), 2)
                         # optionally draw rough bounding rectangle for entire cube.
                         if (SHOW_ENTIRE_BOUNDING_RECTANGLE):
                             w *= 1.3
@@ -453,10 +534,17 @@ class Camera:
                     if is_rotated:
                         self.cube_map.ortho.append(((x, y), color))
                     else:
+                        if (not HAS_CIRCLE_CENTER):
+                            self.cube_map.raw_points.append((x,y))
+
                         if (not is_circle_center):
                             self.cube_angles.append(angle)
                         else:
-                            self.center_cube = center
+                            # All cubies are square, so include this in the calculation.
+                            if (not HAS_CIRCLE_CENTER):
+                                self.cube_angles.append(angle)
+                            else:
+                                self.center_cube = center
 
                     # Draw text color name
                     if (SHOW_CONTOUR_COLOR_TEXT):
@@ -467,9 +555,36 @@ class Camera:
                     # over simplification: turn a curve into a similar one with less points.
                     epsilon = 0.1 * cv.arcLength(c, True)
                     approx = cv.approxPolyDP(c, epsilon, True)
+                    # if (not is_circle_center):
                     cv.drawContours(frame, approx, -1, (0, 255, 0), 5)
 
     def run_main_process(self):
+        '''
+        Highest level function. All functions called must be indirectly rooted here.
+        #### Steps:
+        1.Capture frame. 
+            - Convert BGR to HSV.
+        2.Generate masks. 
+            - Draw contours for each colour. 
+            - Show contour preview (optional).
+        3.Handle rotated recognition
+            - Create rotated mask.
+            - Analyze the values of `cube_angles` (processed during 2. in the "unrotated" frame)
+            - Repeat process of generating masks as in 2.
+        4.Process the cube map. I.e., where do the colours go?
+            - Draw the cube
+        5.If we scanned the whole cube, go to next step. Otherwise, go back to 1 (continue scanning).
+        6.Display solution sequence. Allow camera to keep reading in infinite loop.
+            - Terminate upon user keystroke.
+        ### NOTES:
+        Upon completion, the user will either:
+        - Terminate completely (end entire file process)
+        - Terminate this instance (let's you "start fresh")
+        
+        Any modifications you make to `config.json` or `constants.py` may not appear unless you "Terminate completely" first.
+
+        It is recommended to edit these files while `main.py` is closed. Changes will be apparent upon next run.
+        '''
         while True:
             start = time.time()
             ret, frame = self.cap.read()
@@ -495,6 +610,9 @@ class Camera:
                         self.create_contour_preview(original_frame, c, masks[c])
 
             # Handle rotated recognition.
+            # SELF NOTE: 
+            # This code is nearly identical to the above.
+            # However, to avoid ambiguity, verbosity was favoured.
             if (self.create_rotated_frame(original_frame)):
                 # convert
                 hsv_rotated_frame = cv.cvtColor(
@@ -545,7 +663,7 @@ class Camera:
                     rev_solve_moves = self.cube_map.reverse_notation(solve_moves)
                 except ValueError:
                     print("RETRY")
-                    solve_moves = "INVALID READ SEQUENCE: Please retry."
+                    solve_moves = "INVALID READ SEQUENCE: Please retry. Press 'x' to exit, 'q' to restart, 'c' to toggle SQUARE/CIRCLE custom center recognition"
                 print("PAUSED")
                 while (1):
                     ret, frame = self.cap.read()
@@ -578,12 +696,30 @@ class Camera:
                         return
                     if (key == ord('x')):
                         exit()
+                    if (key == ord('c')):
+                        with open("config.json") as f:
+                            data = json.load(f)
+                            flag = json.loads(data['hasCircleCenter'])
+                            if (flag):
+                                data['hasCircleCenter'] = "false"
+                            else:
+                                data['hasCircleCenter'] = "true"
+                        with open("config.json","w") as fw:
+                            json.dump(data,fw,indent=4)
+
+                        self.cap.release()
+                        cv.destroyAllWindows()
+                        PAUSE_AT_END = False
+                        return
                         # exit()
 
             self.cube_angles.clear()
             self.cube_map.ortho.clear()
+            self.cube_map.raw_points.clear()
+
+
             end = time.time()
-            print(f"{(end-start) * 1000:.1f}")
+            # print(f"{(end-start) * 1000:.1f}")
 
             key = cv.waitKey(1)
             if (key == ord('q')):
@@ -594,6 +730,18 @@ class Camera:
                 self.cube_map.index = self.cube_map.bk[self.cube_map.index]
                 if (self.cube_map.index == -1):
                     self.cube_map.index = 2
+            if (key == ord('c')):
+                with open("config.json") as f:
+                    data = json.load(f)
+                    flag = json.loads(data['hasCircleCenter'])
+                    if (flag):
+                        data['hasCircleCenter'] = "false"
+                    else:
+                        data['hasCircleCenter'] = "true"
+                with open("config.json","w") as fw:
+                    json.dump(data,fw,indent=4)
+                break             
+
         # End process
         self.cap.release()
         cv.destroyAllWindows()
@@ -626,6 +774,17 @@ for c in COLORS:
 while True:
     cam = Camera()
 
+    with open("config.json") as f:
+        data = json.load(f)
+
+    HAS_CIRCLE_CENTER = json.loads(data['hasCircleCenter'])
+
+    if (HAS_CIRCLE_CENTER):
+        MAIN_FRAME_NAME = "Rubik's Cube Reader (CIRCLE)"
+    else:
+        MAIN_FRAME_NAME = "Rubik's Cube Reader (SQUARE)"
+
+    cam.__init__
     cam.run_main_process()
 # cam.__init__()
 # cam = Camera()

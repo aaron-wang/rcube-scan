@@ -27,6 +27,9 @@ STRICT_SQUARE_CONTOUR_BYPASS_RATIO = 1.2
 CIRCLE_CONTOUR_BYPASS_SCALE = 1.1
 # Rotation angle clemency
 ANGLE_EPSILON = 1.0
+# Center Cubie Absolute [pixel] error.
+# CENTER_EPSILON = 10
+CENTER_EPSILON  = 0.07
 
 # CUBE MAPPING
 # -----------
@@ -34,17 +37,17 @@ ANGLE_EPSILON = 1.0
 # to lock color mapping for this side/face.
 # Lower MIN_TOTAL_READING_BUFFER => faster cube mapping, but higher chance of error
 # Also change MIN_COLOR_COUNT_THRESHOLD accordingly
-MIN_TOTAL_READING_BUFFER = 3
+MIN_TOTAL_READING_BUFFER = 5
 
 # Reset reading buffer count to 0 once limit is reached.
-MAX_TOTAL_READING_BUFFER = 7
+MAX_TOTAL_READING_BUFFER = 20
 
 # If after MIN_COLOR_FREQUENCY number of readings, all
 # colors have at least this percentage of confidence.
-MIN_COLOR_CONFIDENCE_THRESHOLD = 0.90
+MIN_COLOR_CONFIDENCE_THRESHOLD = 0.59
 
 # For each cube piece, one color should be read at least this many times.
-MIN_COLOR_COUNT_THRESHOLD = 3
+MIN_COLOR_COUNT_THRESHOLD = 5
 
 # length of a sticker (square)
 STICKER_LENGTH = 20
