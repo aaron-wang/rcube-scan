@@ -9,10 +9,13 @@ An OpenCV app that scans and solves 3x3 Rubik's Cubes using a regular webcam!
 
 **Scan Demo:**
 
-[gif1]
+Square center:
+<!-- [gif2] -->
+![GIF-demo-2-square-conde](https://user-images.githubusercontent.com/66176554/149688477-2ee99327-e4c7-482d-841d-731d89fc36d2.gif)
 
-[gif2]
-
+Circle center:
+<!-- [gif1] -->
+![GIF-demo-1-circle](https://user-images.githubusercontent.com/66176554/149688131-62ae2dcd-8489-4e81-a506-10a864f11815.gif)
 
 
 <!--**Color Detection:**-->
@@ -33,17 +36,20 @@ An OpenCV app that scans and solves 3x3 Rubik's Cubes using a regular webcam!
 
 **Interface example:**
 
-[image 1]
-
-**Solution output:**
-
-[image 2]
+<!-- [image 1] -->
+![image-demo-1](https://user-images.githubusercontent.com/66176554/149688160-c99d6892-bbfe-4ca7-b270-c8ee029666f4.png)
 
 
+**Solution output (different cube from above):**
 
-**Table of contents:**
+<!-- [image 2] -->
 
-[toc]
+![image-demo-2](https://user-images.githubusercontent.com/66176554/149688172-5768c4db-ee6e-4ee8-912d-8e634aa5c228.png)
+
+
+<!-- **Table of contents:**
+
+[toc] -->
 
 ## Installation
 
