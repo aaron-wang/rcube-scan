@@ -1,6 +1,6 @@
 # Rubik's Cube Scanner
 
-An OpenCV app that scans and solves 3x3 Rubik's Cubes using a regular webcam!
+A desktop app using OpenCV that scans and solves 3x3 Rubik's Cubes using a regular webcam!
 
 - Color detection :small_red_triangle:
 - Rotation recognition :arrow_right_hook:
