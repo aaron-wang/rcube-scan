@@ -3,7 +3,7 @@ SHOW_CONTOUR_COLOR_TEXT = True
 SHOW_ENTIRE_BOUNDING_RECTANGLE = False
 
 # introduces latency - but preview the contours
-SHOW_MASK_PREVIEW = 0
+SHOW_MASK_PREVIEW = False
 # if both are true, rotated contours takes precedent.
 SHOW_ROTATED_MASK_PREVIEW = 0
 # show the contour lines on the masks.

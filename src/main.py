@@ -390,17 +390,14 @@ class Camera:
             # print("BEST DELTA:\t",best_delta)
             # print("FAR DELTA:\t",far_delta)
             # print("TOLERANCE:\t", far_delta * 1.0/3.0 * CENTER_EPSILON)
-            print()
+            # print()
+            pass
+        # far_delta is diagonal length.
+        # 1.0/3.0 considers the diagonal of one cubie/square.
         if (best_delta < far_delta * 1.0/3.0 * CENTER_EPSILON):
             return best_point
         else:
-            return False
-
-        # if (best_delta - avg_point)
-        
-
-
-            
+            return False   
 
     def create_rotated_frame(self, frame):
         '''
