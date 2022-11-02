@@ -2,10 +2,10 @@
 
 A desktop app using OpenCV that scans and solves 3x3 Rubik's Cubes using a regular webcam!
 
-- Color detection :small_red_triangle:
-- Rotation recognition :arrow_right_hook:
-- Outputs solution :bulb:
-- Recognizes square center :white_large_square: AND circle-center cubes :white_circle:
+- Supports scanning within seconds
+- Recognizes Rubik's cubes on an angle, and far away from the camera
+- Outputs the solution afterwards
+- Handles both square center and circle-center Rubik's Cubes
 
 **Scan Demo:**
 
@@ -67,7 +67,7 @@ Clone the repository locally.
 
 ## Usage
 
-The following section is verbose in order to eliminate ambiguity.
+The following section is verbose in order to eliminate ambiguity. It's also a bit informal!
 
 ### Start up:
 
@@ -189,34 +189,37 @@ This could mean:
 
 ### Tips:
 
-These are not exhaustive lists. 
+These are not exhaustive lists, and are completely optional!
 
 #### DO:
 
 - Use an external webcam if possible
   - Certain integrated webcams for laptops are too low quality or "dull" the color vibrancy
 - Be in a well-lit room
-- Remove any objects with prominent squares with solid color (in the background)
-  - If circle-center cube scanning, avoid circles in the background too
-- Avoid checkerboard pattern rooms :slightly_smiling_face:
 
 #### DON'T:
 
 - **Have an invalid (unsolvable) cube state!**
+  
   - This occurs commonly if you've ever
     - physically switched stickers
     - physically twisted corners or flipped edges 
     - taken apart a cube and reassembled it into a non-solved state
   - This will cause you to consistently get errors telling you to rescan
+  
 - Have excessive lighting (directly onto the cube)
   - For glossy stickers, this reflects white light.
-- Have poor lighting
+  
 - Obstruct cube face with objects or fingers
-- Use sticker-less or borderless cubes
+
+- Use sticker-less or borderless Rubik's cubes
   - If squares of the same color are bordering each other, this registers as one quadrilateral or concave polygon
-- Use cubes with black stickers replacing white stickers
+  
+- Use Rubik's cubes with black stickers instead of white stickers
+
 - Use non-3x3 Rubik's cubes
-- Scan two cubes at the same time
+
+- Scan two different cubes at the same time
 
 
 
@@ -301,8 +304,8 @@ Rest of flags/constants are in `constants.py`. You will **not need to edit any o
     - Used in determining square center.
 - Cube mapping
   - How "confident" does the scan have to be?
-    - color % accuracy
-    - minimum # of frames
+    - color percentage accuracy before moving on
+    - minimum number of frames before moving on
   - Drawing of the cube preview on screen
 
 ## Inspiration
