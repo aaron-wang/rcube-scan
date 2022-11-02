@@ -43,6 +43,7 @@ class CubeMap:
 
         from_index = ['b', 'w', 'r', 'y', 'o', 'g']
 
+        # Assign each color a number from 0 to 5 inclusive.
         to_index = {'b': 0, 'w': 1, 'r': 2, 'y': 3, 'o': 4, 'g': 5,'_':99}
 
         to_bgr_color = {
@@ -51,7 +52,6 @@ class CubeMap:
             'r': (0, 0, 255),
             'y': (0, 255, 255),
             'o': (0, 128, 255),
-            # 'g': (50, 191, 50),
             'g': (74,200,32),
             '_': (128, 128, 128)
         }
@@ -66,17 +66,19 @@ class CubeMap:
         }
 
     def __init__(self):
-        # which cube color
+        # Which cube color we are on.
         self.index = 2
-        # count of frames read.
+        # Count of frames read.
         self.total_readings = 0
-        # ortho: ((x,y),'fullcolor_name')
+        # The list ortho has type: ((x,y),'fullcolor_name')
         self.ortho = []
-        # raw_points: (x,y)
+        # The list raw_points has type : (x,y)
         self.raw_points = []
         # Map of cube faces.
         self.map = [[['_' for col in range(3)]
                      for row in range(3)] for colors in range(6)]
+        # Transform the color into standard notation. 'X' is an error value.
+        # Values map as follows:
         # U R F D L B
         # 0 3 2 5 1 4
         self.flat_map = {
@@ -133,9 +135,8 @@ class CubeMap:
         Called on every frame capture read.
         '''
         global PAUSE_AT_END
-        # sort by y value
-        # then chunk in groups of 3:
-        # sort by x value for each respective group
+        # Sort by y value, then chunk into groups of 3.
+        # Next, sort by x value for each respective group
         if (self.total_readings > MAX_TOTAL_READING_BUFFER):
             self.reset_mapping()
 
@@ -365,7 +366,7 @@ class Camera:
         if (SHOW_DEBUG_CONSOLE_TXT):
             pass
         # far_delta is diagonal length.
-        # 1.0/3.0 considers the diagonal of one cubie/square.
+        # 1.0/3.0 considers the diagonal of one cubie/square on the cube.
         if (best_delta < far_delta * 1.0/3.0 * CENTER_EPSILON):
             return best_point
         else:
@@ -382,24 +383,24 @@ class Camera:
 
         
         if (HAS_CIRCLE_CENTER):
-            # get median and average.
+            # Get the median and average of all the angles.
             if (len(self.cube_angles) == 8):
                 mean_angle /= len(self.cube_angles)
                 median_angle = self.cube_angles[len(self.cube_angles) // 2]
                 if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
-                    # The average angle is more accurate than the median
+                    # The average angle is more accurate than the median in this case.
                     rotate_angle = mean_angle
                 else:
                     rotate_angle = median_angle
             else:
                 return False
         else:
-            #Proceed exactly as in above.
+            # Proceed exactly as in above.
             if (len(self.cube_angles) == 9):
                 mean_angle /= len(self.cube_angles)
                 median_angle = self.cube_angles[len(self.cube_angles) // 2]
                 if (median_angle != 0 and abs(mean_angle - median_angle) / median_angle < 0.08):
-                    # The average angle is more accurate than the median
+                    # The average angle is more accurate than the median in this case.
                     rotate_angle = mean_angle
                 else:
                     rotate_angle = median_angle
@@ -412,8 +413,8 @@ class Camera:
                     self.center_cube = flag
             else:
                 return False
-        # Prevent inaccuracies when cube angle is uncertain
-        # (two orientations with near likely probability)
+        # Prevent inaccuracies when the cube angle is uncertain
+        # (Informally, this means that if the angle is very close to 45, then return false)
         if (abs(rotate_angle - 45) < ANGLE_EPSILON):
             print("Please rotate cube")
             return False
@@ -461,21 +462,25 @@ class Camera:
             for c in contours:
                 if (cv.contourArea(c) > MIN_CONTOUR_THRESHOLD):
                     x, y, w, h = cv.boundingRect(c)
+
                     # Bypass false detection (short ciruit)
                     if (self.contour_bypass(w, h, LENIENT_SQUARE_CONTOUR_BYPASS_RATIO)):
                         continue
+                    
                     # Generate rotated rectangle
                     rect = cv.minAreaRect(c)
                     w2, h2 = rect[1]
                     rot_area = w2 * h2
                     box = cv.boxPoints(rect)
                     box = np.int0(box)
+
                     # Bypass false detection (strict)
                     if (self.contour_bypass(w2, h2, STRICT_SQUARE_CONTOUR_BYPASS_RATIO)):
                         continue
-                    # angle
+
                     angle = (rect[2])
-                    # Draw min circle
+                    
+                    # Draw minimum enclosing circle
                     (cx, cy), radius = cv.minEnclosingCircle(c)
                     center = (int(cx), int(cy))
                     circ_area = pi * radius * radius
@@ -484,12 +489,11 @@ class Camera:
                     is_circle_center = (
                         circ_area <= CIRCLE_CONTOUR_BYPASS_SCALE * rot_area)
                     if (not is_circle_center or is_rotated):
-                        # cv.drawContours(frame, [box], 0, (0, 255, 0), 2)
                         pass
                     else:
                         if (HAS_CIRCLE_CENTER):
                             cv.circle(frame, center, radius, (0, 0, 255), 2)
-                        # optionally draw rough bounding rectangle for entire cube.
+                        # Optionally draw rough bounding rectangle for entire cube.
                         if (SHOW_ENTIRE_BOUNDING_RECTANGLE):
                             w *= 1.3
                             h *= 1.3
@@ -512,16 +516,15 @@ class Camera:
                             else:
                                 self.center_cube = center
 
-                    # Draw text color name
+                    # Display text on the cube stating the current identified color 
                     if (SHOW_CONTOUR_COLOR_TEXT):
                         cv.putText(frame, color, (x + 7, y + h // 2),
                                    cv.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
 
-                    # Contour approximation based on the Douglas - Peucker algorithm
-                    # over simplification: turn a curve into a similar one with less points.
+                    # Contour approximation based on the Douglas - Peucker algorithm.
+                    # Informally, the over-simplification is: Turn a curve into a similar one with less points.
                     epsilon = 0.1 * cv.arcLength(c, True)
                     approx = cv.approxPolyDP(c, epsilon, True)
-                    # if (not is_circle_center):
                     cv.drawContours(frame, approx, -1, (0, 255, 0), 5)
 
     def run_main_process(self):
@@ -558,8 +561,8 @@ class Camera:
                 frame = cv.resize(frame,(800,600))
             original_frame = copy.copy(frame)
 
-            # Main color recognition
-            # Convert from BGR to HSV colorspace.
+            # Main color recognition.
+            # Convert from BGR to HSV color space.
             hsv_frame = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
 
             # Generate masks.
@@ -576,15 +579,15 @@ class Camera:
                         self.create_contour_preview(original_frame, c, masks[c])
 
             # Handle rotated recognition.
-            # SELF NOTE: 
+            # NOTE:
             # This code is nearly identical to the above.
             # However, to avoid ambiguity, verbosity was favoured.
             if (self.create_rotated_frame(original_frame)):
-                # convert
+                # Convert from BGR to HSV color space (for the rotated frame).
                 hsv_rotated_frame = cv.cvtColor(
                     self.rotated_frame, cv.COLOR_BGR2HSV)
 
-                # generate masks.
+                # Generate masks (for the rotated frame).
                 rotated_masks = dict((c, cv.inRange(
                     hsv_rotated_frame, HSV_BOUND[c][0], HSV_BOUND[c][1])) for c in COLORS)
                 rotated_masks['red'] |= cv.inRange(
@@ -612,7 +615,7 @@ class Camera:
             self.cube_map.draw_supercube(frame,(10,50),True)
 
             cv.imshow(MAIN_FRAME_NAME, frame)
-            # allow cam to keep reading, but not process any further.
+            # Allow camera to keep reading, but not process any further.
             global PAUSE_AT_END
             if (PAUSE_AT_END):
                 try:
@@ -667,7 +670,6 @@ class Camera:
                         cv.destroyAllWindows()
                         PAUSE_AT_END = False
                         return
-                        # exit()
 
             self.cube_angles.clear()
             self.cube_map.ortho.clear()
@@ -675,7 +677,6 @@ class Camera:
 
 
             end = time.time()
-            # print(f"{(end-start) * 1000:.1f}")
 
             key = cv.waitKey(1)
             if (key == ord('q')):
