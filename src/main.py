@@ -150,12 +150,8 @@ class CubeMap:
         center_color = self.ortho[3*1 + 1][1]
 
         if (center_color[0] == self.Color.from_index[self.bk[self.index]]):
-            # print(
-            # f"OLD POSITION: move cube to {self.Color.from_index[self.index]}")
             return False
         if (center_color[0] != self.Color.from_index[self.index]):
-            # print(
-            # f"WRONG STARTING COLOR: start on {self.Color.from_index[self.index]}")
             return False
 
         for row in range(3):
@@ -250,7 +246,6 @@ class CubeMap:
             5
         Empty parts of 3 x 4 grid are skipped.
         '''
-        # (cx, cy) = (50, 50)
         if (LOW_RES_CAMERA):
             (cx, cy) = (330, 50)
         else:
@@ -281,9 +276,6 @@ class CubeMap:
             for i in range(3):
                 for j in range(3):
                     ret += self.color_to_notation(self.map[face][i][j])
-        # ret = ''.join([self.color_to_notation(self.map[face][i][j]) if face != 99 else '' for j in range(3)
-        # for i in range(3) for face in self.flat_map.keys()])
-        # print(ret)
         return ret
 
     def reverse_notation(self,org_notation):
@@ -332,16 +324,6 @@ class Camera:
         self.center_cube = (0, 0)
         self.rotated_frame = None
         self.cap = cv.VideoCapture(0, cv.CAP_DSHOW)
-
-        # self.cap = cv.VideoCapture(1, cv.CAP_DSHOW)
-        # print(self.cap.get(3))
-        # print(self.cap.get(4))
-        # if (not LOW_RES_CAMERA):
-        # self.cap. set(cv.CAP_PROP_FRAME_WIDTH, 800)
-        # self.cap. set(cv.CAP_PROP_FRAME_HEIGHT, 600)
-        # print(self.cap.get(3))
-        # print(self.cap.get(4))
-        # self.cap.set(cv.CAP_PROP_BUFFERSIZE, 1);
         self.cube_map = CubeMap()
 
     def contour_bypass(self, w, h, contour_bypass_ratio) -> bool:
@@ -368,14 +350,11 @@ class Camera:
         avg_point_y = sum(y for _, y in self.cube_map.raw_points) /9
         avg_point = (avg_point_x, avg_point_y)
 
-        # print(avg_point)
-
         (best_point, best_delta) = (self.cube_map.raw_points[0], dist(avg_point,self.cube_map.raw_points[0]))
         (far_point, far_delta) = (best_point, best_delta)
 
         for pt in self.cube_map.raw_points:
             curr_dist = dist(avg_point,pt)
-            # print(curr_dist)
             if (curr_dist < best_delta):
                 best_delta = curr_dist
                 best_point = pt
@@ -383,14 +362,7 @@ class Camera:
                 far_delta = curr_dist
                 far_point = pt
 
-        # cv.circle(frame,center=best_point,radius=5,color=(0,0,200))
-        # cv.imshow("frame2",frame)
-
         if (SHOW_DEBUG_CONSOLE_TXT):
-            # print("BEST DELTA:\t",best_delta)
-            # print("FAR DELTA:\t",far_delta)
-            # print("TOLERANCE:\t", far_delta * 1.0/3.0 * CENTER_EPSILON)
-            # print()
             pass
         # far_delta is diagonal length.
         # 1.0/3.0 considers the diagonal of one cubie/square.
@@ -422,7 +394,6 @@ class Camera:
             else:
                 return False
         else:
-            # print("ROTATED CASE")
             #Proceed exactly as in above.
             if (len(self.cube_angles) == 9):
                 mean_angle /= len(self.cube_angles)
@@ -436,12 +407,10 @@ class Camera:
                 flag = self.find_center_cube(frame)
 
                 if (type(flag) is bool):
-                    # print("type flag is bool")
                     return False
                 else:
                     self.center_cube = flag
             else:
-                # print("EARLY EXIT 1")
                 return False
         # Prevent inaccuracies when cube angle is uncertain
         # (two orientations with near likely probability)
@@ -640,8 +609,6 @@ class Camera:
                 pass
 
             self.cube_map.process()
-            # self.cube_map.draw_supercube(frame,(600,50),True)
-            # self.cube_map.draw_supercube(frame,(500,50),True)
             self.cube_map.draw_supercube(frame,(10,50),True)
 
             cv.imshow(MAIN_FRAME_NAME, frame)
@@ -656,7 +623,6 @@ class Camera:
                 rev_solve_moves = ""
                 try:
                     solve_moves = (kociemba.solve(self.cube_map.flatten_cube()))
-                    # print(solve_moves)
                     rev_solve_moves = self.cube_map.reverse_notation(solve_moves)
                 except ValueError:
                     print("RETRY")
@@ -668,14 +634,7 @@ class Camera:
                     if (not LOW_RES_CAMERA):
                         frame = cv.resize(frame,(800,600))
 
-                    # self.cube_map.draw_supercube(frame,(500,50),True)
                     self.cube_map.draw_supercube(frame,(10,50),True)
-                    # cv.putText(frame, solve_moves , (20,400),
-                    #                cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
-                    # cv.putText(frame, rev_solve_moves , (20,440),
-                    #                cv.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
-                    # solve_moves = "U L2 F L F R F L2 U' B D' R' D R2 D' B2 R2 D2 B2 R2 D2 R2 R2 R2 R2 R2 U2 R2 R2 U2"
-                    # rev_solve_moves = solve_moves
                     if (LOW_RES_CAMERA):
                         cv.rectangle(frame,(10,380),(630,470),(254,217,255),-1)
                         self.cube_map.special_draw_text(frame,solve_moves,(12,405),0.7,2,48)
@@ -783,7 +742,3 @@ while True:
 
     cam.__init__
     cam.run_main_process()
-# cam.__init__()
-# cam = Camera()
-
-# cam.run_main_process()
